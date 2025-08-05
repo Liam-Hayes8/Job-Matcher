@@ -135,14 +135,6 @@ gcloud projects add-iam-policy-binding your-project-id \
 
 ### 8. Deploy Application
 
-Push to the main branch to trigger deployment:
-
-```bash
-git add .
-git commit -m "Initial deployment"
-git push origin main
-```
-
 ## Local Development
 
 ### Backend Development
