@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: job-matcher-backend
+  namespace: job-matcher
+  labels:
+    app: job-matcher-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: job-matcher-backend
+  template:
+    metadata:
+      labels:
+        app: job-matcher-backend
+    spec:
+      serviceAccountName: job-matcher-backend
+      containers:
+      - name: backend
+        image: REGION-docker.pkg.dev/PROJECT_ID/job-matcher-docker/backend:latest
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: PROJECT_ID
+          value: "PROJECT_ID"
+        - name: DB_HOST
+          value: "127.0.0.1"  # Cloud SQL Proxy sidecar
+        - name: DB_NAME
+          value: "job-matcher"
+        - name: DB_USER
+          value: "job_matcher_user"
+        - name: RESUME_BUCKET_NAME
+          value: "PROJECT_ID-job-matcher-resumes"
+        envFrom:
+        - configMapRef:
+            name: job-matcher-config
+        - secretRef:
+            name: job-matcher-secrets
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      - name: cloud-sql-proxy
+        image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.7.2
+        args:
+          - "--structured-logs"
+          - "--port=5432"
+          - "PROJECT_ID:REGION:job-matcher-postgres"
+        securityContext:
+          runAsNonRoot: true
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"

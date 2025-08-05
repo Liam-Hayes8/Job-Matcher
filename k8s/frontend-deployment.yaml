@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: job-matcher-frontend
+  namespace: job-matcher
+  labels:
+    app: job-matcher-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: job-matcher-frontend
+  template:
+    metadata:
+      labels:
+        app: job-matcher-frontend
+    spec:
+      serviceAccountName: job-matcher-frontend
+      containers:
+      - name: frontend
+        image: REGION-docker.pkg.dev/PROJECT_ID/job-matcher-docker/frontend:latest
+        ports:
+        - containerPort: 80
+          name: http
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5

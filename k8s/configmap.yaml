@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: job-matcher-config
+  namespace: job-matcher
+data:
+  API_V1_STR: "/api/v1"
+  DEBUG: "false"
+  PROJECT_NAME: "Job Matcher"
+  ENVIRONMENT: "production"
+  DB_PORT: "5432"
+  SPACY_MODEL: "en_core_web_sm"
+  MODEL_PATH: "/app/models"

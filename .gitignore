@@ -205,3 +205,57 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Job Matcher specific
+# Terraform state and vars
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+*.tfplan
+
+# Node.js / React
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+build/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Secrets and keys
+*.pem
+*.key
+*.crt
+*.p12
+service-account.json
+firebase-config.json
+gcp-key.json
+
+# Local development
+uploads/
+resumes/
+tmp/
+temp/
+.tmp/
+
+# Cloud Function packages
+functions/resume-parser.zip
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

@@ -1,0 +1,7 @@
+project_id              = "your-gcp-project-id"
+region                  = "us-west2"
+zone                    = "us-west2-a"
+terraform_state_bucket  = "your-terraform-state-bucket"
+environment            = "prod"
+app_name               = "job-matcher"
+db_password            = "your-secure-database-password"

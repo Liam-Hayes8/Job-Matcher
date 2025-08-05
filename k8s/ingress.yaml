@@ -1,0 +1,48 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: job-matcher-ingress
+  namespace: job-matcher
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "job-matcher-ip"
+    networking.gke.io/managed-certificates: "job-matcher-ssl-cert"
+    networking.gke.io/v1beta1.FrontendConfig: "job-matcher-frontend-config"
+spec:
+  rules:
+  - host: job-matcher.example.com  # Replace with your domain
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: job-matcher-backend
+            port:
+              number: 8000
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: job-matcher-frontend
+            port:
+              number: 80
+---
+apiVersion: networking.gke.io/v1beta1
+kind: ManagedCertificate
+metadata:
+  name: job-matcher-ssl-cert
+  namespace: job-matcher
+spec:
+  domains:
+    - job-matcher.example.com  # Replace with your domain
+---
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: job-matcher-frontend-config
+  namespace: job-matcher
+spec:
+  redirectToHttps:
+    enabled: true
+  sslPolicy: "job-matcher-ssl-policy"
