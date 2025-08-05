@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: job_matcher
+      POSTGRES_USER: job_matcher_user
+      POSTGRES_PASSWORD: local_dev_password
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U job_matcher_user -d job_matcher"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://job_matcher_user:local_dev_password@postgres:5432/job_matcher
+      - DEBUG=true
+      - PROJECT_ID=local-dev
+      - ENVIRONMENT=development
+      - API_V1_STR=/api/v1
+      - PROJECT_NAME=Job Matcher Local
+      - ALLOWED_ORIGINS=["http://localhost:3000", "http://localhost:8080"]
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - ./uploads:/tmp/uploads
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    environment:
+      - REACT_APP_API_BASE_URL=http://localhost:8000
+      - REACT_APP_FIREBASE_API_KEY=demo-key
+      - REACT_APP_FIREBASE_AUTH_DOMAIN=demo.firebaseapp.com
+      - REACT_APP_FIREBASE_PROJECT_ID=demo-project
+      - REACT_APP_FIREBASE_STORAGE_BUCKET=demo.appspot.com
+      - REACT_APP_FIREBASE_MESSAGING_SENDER_ID=123456789
+      - REACT_APP_FIREBASE_APP_ID=demo-app-id
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

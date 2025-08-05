@@ -5,11 +5,17 @@ import uvicorn
 import logging
 from contextlib import asynccontextmanager
 
+import os
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.api.v1.api import api_router
-from app.core.auth import verify_firebase_token
 from app.services.logging_service import setup_logging
+
+# Use local auth for development
+if os.getenv("ENVIRONMENT") == "development":
+    from app.core.local_auth import verify_firebase_token_local as verify_firebase_token
+else:
+    from app.core.auth import verify_firebase_token
 
 setup_logging()
 logger = logging.getLogger(__name__)
