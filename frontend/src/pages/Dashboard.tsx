@@ -9,17 +9,24 @@ import {
   CardActions,
   Box,
   Chip,
+  Skeleton,
+  Alert,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from 'react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSnackbar } from 'notistack';
 import { resumeApi, setAuthToken } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import FindInPageIcon from '@mui/icons-material/FindInPage';
+import DeleteIcon from '@mui/icons-material/Delete';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { getToken, user } = useAuth();
+  const { enqueueSnackbar } = useSnackbar();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const setupAuth = async () => {
@@ -29,45 +36,69 @@ const Dashboard: React.FC = () => {
     setupAuth();
   }, [getToken]);
 
-  const { data: resumes, isLoading, refetch } = useQuery(
-    'resumes',
-    () => resumeApi.getResumes().then(res => res.data),
-    {
-      enabled: !!user,
-    }
-  );
+  const { data: resumes, isLoading, error } = useQuery({
+    queryKey: ['resumes'],
+    queryFn: () => resumeApi.getResumes().then(res => res.data),
+    enabled: !!user,
+  });
+
+  const parseResumeMutation = useMutation({
+    mutationFn: (resumeId: number) => resumeApi.parseResume(resumeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['resumes'] });
+      enqueueSnackbar('Resume parsed successfully!', { variant: 'success' });
+    },
+    onError: (error: any) => {
+      console.error('Failed to parse resume:', error);
+      enqueueSnackbar(
+        error.response?.data?.detail || 'Failed to parse resume', 
+        { variant: 'error' }
+      );
+    },
+  });
+
+  const deleteResumeMutation = useMutation({
+    mutationFn: (resumeId: number) => resumeApi.deleteResume(resumeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['resumes'] });
+      enqueueSnackbar('Resume deleted successfully!', { variant: 'success' });
+    },
+    onError: (error: any) => {
+      console.error('Failed to delete resume:', error);
+      enqueueSnackbar(
+        error.response?.data?.detail || 'Failed to delete resume', 
+        { variant: 'error' }
+      );
+    },
+  });
 
   const handleParseResume = async (resumeId: number) => {
-    try {
-      await resumeApi.parseResume(resumeId);
-      refetch();
-    } catch (error) {
-      console.error('Failed to parse resume:', error);
-    }
+    parseResumeMutation.mutate(resumeId);
   };
 
   const handleDeleteResume = async (resumeId: number) => {
-    try {
-      await resumeApi.deleteResume(resumeId);
-      refetch();
-    } catch (error) {
-      console.error('Failed to delete resume:', error);
+    if (window.confirm('Are you sure you want to delete this resume?')) {
+      deleteResumeMutation.mutate(resumeId);
     }
   };
 
-  if (isLoading) {
-    return <Typography>Loading...</Typography>;
+  if (error) {
+    return (
+      <Alert severity="error" sx={{ mb: 2 }}>
+        Failed to load resumes: {error.message}
+      </Alert>
+    );
   }
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
+      <Typography variant="h4" gutterBottom sx={{ mb: 4 }}>
         Dashboard
       </Typography>
 
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3, textAlign: 'center' }}>
+          <Paper sx={{ p: 3, textAlign: 'center', height: '100%' }}>
             <UploadFileIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
             <Typography variant="h6" gutterBottom>
               Upload Resume
@@ -79,6 +110,7 @@ const Dashboard: React.FC = () => {
               variant="contained"
               onClick={() => navigate('/upload')}
               sx={{ mt: 2 }}
+              startIcon={<UploadFileIcon />}
             >
               Upload Resume
             </Button>
@@ -86,66 +118,114 @@ const Dashboard: React.FC = () => {
         </Grid>
 
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3 }}>
+          <Paper sx={{ p: 3, height: '100%' }}>
             <Typography variant="h6" gutterBottom>
               Resume Statistics
             </Typography>
-            <Typography variant="body1">
-              Total Resumes: {resumes?.length || 0}
-            </Typography>
-            <Typography variant="body1">
-              Parsed Resumes: {resumes?.filter(r => r.parsed_data).length || 0}
-            </Typography>
+            {isLoading ? (
+              <Box>
+                <Skeleton variant="text" width="60%" />
+                <Skeleton variant="text" width="40%" />
+              </Box>
+            ) : (
+              <Box>
+                <Typography variant="body1" sx={{ mb: 1 }}>
+                  Total Resumes: {resumes?.length || 0}
+                </Typography>
+                <Typography variant="body1" sx={{ mb: 1 }}>
+                  Parsed Resumes: {resumes?.filter(r => r.parsed_data).length || 0}
+                </Typography>
+                <Typography variant="body1">
+                  Ready for Matching: {resumes?.filter(r => r.parsed_data).length || 0}
+                </Typography>
+              </Box>
+            )}
           </Paper>
         </Grid>
 
         <Grid item xs={12}>
-          <Typography variant="h5" gutterBottom sx={{ mt: 3 }}>
+          <Typography variant="h5" gutterBottom sx={{ mt: 3, mb: 2 }}>
             Your Resumes
           </Typography>
           
-          {resumes && resumes.length > 0 ? (
+          {isLoading ? (
+            <Grid container spacing={2}>
+              {[1, 2, 3].map((i) => (
+                <Grid item xs={12} md={6} lg={4} key={i}>
+                  <Card>
+                    <CardContent>
+                      <Skeleton variant="text" width="80%" />
+                      <Skeleton variant="text" width="60%" />
+                      <Skeleton variant="text" width="40%" />
+                    </CardContent>
+                    <CardActions>
+                      <Skeleton variant="rectangular" width={60} height={32} />
+                      <Skeleton variant="rectangular" width={60} height={32} />
+                    </CardActions>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          ) : resumes && resumes.length > 0 ? (
             <Grid container spacing={2}>
               {resumes.map((resume) => (
                 <Grid item xs={12} md={6} lg={4} key={resume.id}>
-                  <Card>
-                    <CardContent>
-                      <Typography variant="h6" gutterBottom>
+                  <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <CardContent sx={{ flexGrow: 1 }}>
+                      <Typography variant="h6" gutterBottom noWrap>
                         {resume.filename}
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
                         Uploaded: {new Date(resume.created_at).toLocaleDateString()}
                       </Typography>
                       <Box sx={{ mt: 1 }}>
                         {resume.parsed_data ? (
-                          <Chip label="Parsed" color="success" size="small" />
+                          <Chip 
+                            label="Parsed" 
+                            color="success" 
+                            size="small" 
+                            icon={<PlayArrowIcon />}
+                          />
                         ) : (
-                          <Chip label="Not Parsed" color="warning" size="small" />
+                          <Chip 
+                            label="Not Parsed" 
+                            color="warning" 
+                            size="small" 
+                          />
                         )}
                       </Box>
                     </CardContent>
-                    <CardActions>
-                      {!resume.parsed_data && (
-                        <Button 
-                          size="small"
-                          onClick={() => handleParseResume(resume.id)}
-                        >
-                          Parse
-                        </Button>
-                      )}
-                      {resume.parsed_data && (
-                        <Button 
-                          size="small"
-                          startIcon={<FindInPageIcon />}
-                          onClick={() => navigate(`/matches/${resume.id}`)}
-                        >
-                          Find Jobs
-                        </Button>
-                      )}
+                    <CardActions sx={{ justifyContent: 'space-between' }}>
+                      <Box>
+                        {!resume.parsed_data && (
+                          <Button 
+                            size="small"
+                            variant="outlined"
+                            onClick={() => handleParseResume(resume.id)}
+                            disabled={parseResumeMutation.isPending}
+                            startIcon={<PlayArrowIcon />}
+                          >
+                            {parseResumeMutation.isPending ? 'Parsing...' : 'Parse'}
+                          </Button>
+                        )}
+                        {resume.parsed_data && (
+                          <Button 
+                            size="small"
+                            variant="contained"
+                            startIcon={<FindInPageIcon />}
+                            onClick={() => navigate(`/matches/${resume.id}`)}
+                          >
+                            Find Jobs
+                          </Button>
+                        )}
+                      </Box>
                       <Button 
                         size="small" 
                         color="error"
+                        variant="outlined"
                         onClick={() => handleDeleteResume(resume.id)}
+                        disabled={deleteResumeMutation.isPending}
+                        startIcon={<DeleteIcon />}
                       >
                         Delete
                       </Button>
@@ -155,14 +235,19 @@ const Dashboard: React.FC = () => {
               ))}
             </Grid>
           ) : (
-            <Paper sx={{ p: 3, textAlign: 'center' }}>
-              <Typography variant="body1" color="text.secondary">
-                No resumes uploaded yet. Upload your first resume to get started!
+            <Paper sx={{ p: 4, textAlign: 'center' }}>
+              <UploadFileIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+              <Typography variant="h6" gutterBottom color="text.secondary">
+                No resumes uploaded yet
+              </Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Upload your first resume to get started with job matching!
               </Typography>
               <Button
-                variant="outlined"
+                variant="contained"
                 onClick={() => navigate('/upload')}
                 sx={{ mt: 2 }}
+                startIcon={<UploadFileIcon />}
               >
                 Upload Resume
               </Button>
