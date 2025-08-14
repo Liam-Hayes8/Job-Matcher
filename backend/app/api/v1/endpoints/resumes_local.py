@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 import aiofiles
 import os
+import json
 from app.core.database import get_db
 from app.models.resume import Resume
 from app.schemas.resume import Resume as ResumeSchema, ResumeCreate, ResumeParseResponse
@@ -110,7 +111,7 @@ async def parse_resume(
         
         parsed_data = resume_service.parse_resume_content(resume.content)
         
-        resume.parsed_data = parsed_data
+        resume.parsed_data = json.dumps(parsed_data)
         db.commit()
         
         return ResumeParseResponse(

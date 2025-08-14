@@ -10,6 +10,8 @@ from app.core.config import settings
 from app.core.database import engine, Base
 from app.api.v1.api_local import api_router
 from app.services.logging_service_local import setup_logging
+# Import models to ensure they are registered with SQLAlchemy
+from app.models import resume
 
 setup_logging()
 logger = logging.getLogger(__name__)

@@ -1,6 +1,7 @@
-from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
+from pydantic import BaseModel, Field, field_validator
+from typing import List, Dict, Any, Optional, Union
 from datetime import datetime
+import json
 
 class ResumeBase(BaseModel):
     filename: str
@@ -17,7 +18,6 @@ class Resume(ResumeBase):
     id: int
     user_id: str
     file_path: str
-    parsed_data: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 
