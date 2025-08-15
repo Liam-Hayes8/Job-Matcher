@@ -1,0 +1,127 @@
+# Company configurations for ATS job sources
+# Maps company names to their ATS provider and slug/board token
+
+companies:
+  # Greenhouse companies
+  - name: "Google"
+    ats: "greenhouse"
+    slug: "google"  # Board token for Greenhouse
+    
+  - name: "Microsoft"
+    ats: "greenhouse"
+    slug: "microsoft"
+    
+  - name: "Netflix"
+    ats: "greenhouse"
+    slug: "netflix"
+    
+  - name: "Spotify"
+    ats: "greenhouse"
+    slug: "spotify"
+    
+  - name: "Airbnb"
+    ats: "greenhouse"
+    slug: "airbnb"
+    
+  - name: "Uber"
+    ats: "greenhouse"
+    slug: "uber"
+    
+  - name: "Stripe"
+    ats: "greenhouse"
+    slug: "stripe"
+    
+  - name: "Square"
+    ats: "greenhouse"
+    slug: "square"
+    
+  - name: "Pinterest"
+    ats: "greenhouse"
+    slug: "pinterest"
+    
+  - name: "Slack"
+    ats: "greenhouse"
+    slug: "slack"
+    
+  # Lever companies
+  - name: "Meta"
+    ats: "lever"
+    slug: "meta"  # Site handle for Lever
+    
+  - name: "Apple"
+    ats: "lever"
+    slug: "apple"
+    
+  - name: "Amazon"
+    ats: "lever"
+    slug: "amazon"
+    
+  - name: "Twitter"
+    ats: "lever"
+    slug: "twitter"
+    
+  - name: "LinkedIn"
+    ats: "lever"
+    slug: "linkedin"
+    
+  - name: "Salesforce"
+    ats: "lever"
+    slug: "salesforce"
+    
+  - name: "Adobe"
+    ats: "lever"
+    slug: "adobe"
+    
+  - name: "Intel"
+    ats: "lever"
+    slug: "intel"
+    
+  # Ashby companies
+  - name: "Notion"
+    ats: "ashby"
+    slug: "notion"  # Board name for Ashby
+    
+  - name: "Figma"
+    ats: "ashby"
+    slug: "figma"
+    
+  - name: "Linear"
+    ats: "ashby"
+    slug: "linear"
+    
+  - name: "Vercel"
+    ats: "ashby"
+    slug: "vercel"
+    
+  - name: "Retool"
+    ats: "ashby"
+    slug: "retool"
+    
+  - name: "Plaid"
+    ats: "ashby"
+    slug: "plaid"
+    
+  - name: "Brex"
+    ats: "ashby"
+    slug: "brex"
+    
+  - name: "Scale AI"
+    ats: "ashby"
+    slug: "scale-ai"
+
+# Configuration for job filtering and ranking
+settings:
+  max_jobs_per_request: 50
+  max_age_hours: 48  # Only return jobs posted in last 48 hours
+  link_validation_timeout: 8  # seconds
+  fetch_timeout: 12  # seconds total for all sources
+  
+# Keywords to prioritize for internship matching
+internship_keywords:
+  - "intern"
+  - "internship"
+  - "co-op"
+  - "student"
+  - "summer"
+  - "graduate"
+  - "entry level"

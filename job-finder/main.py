@@ -14,6 +14,7 @@ from app.services.ats_service import ATSService
 from app.services.matching_service import MatchingService
 from app.core.config import settings
 from app.core.database import get_db, DatabaseManager
+from app.routes import router as live_jobs_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -38,6 +39,9 @@ app.add_middleware(
 embedding_service = EmbeddingService()
 ats_service = ATSService()
 matching_service = MatchingService()
+
+# Include live jobs routes
+app.include_router(live_jobs_router, prefix="/api/v1", tags=["live-jobs"])
 
 @app.on_event("startup")
 async def startup_event():

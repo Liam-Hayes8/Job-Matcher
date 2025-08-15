@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+const JOB_FINDER_URL = process.env.REACT_APP_JOB_FINDER_URL || 'http://localhost:8080';
 
 export const api = axios.create({
   baseURL: `${API_BASE_URL}/api/v1`,
@@ -119,11 +120,11 @@ export const jobApi = {
 
 export const liveJobApi = {
   searchLiveJobs: (request: LiveJobSearchRequest) => 
-    api.post<LiveJobSearchResponse>('/jobs/live', request),
-
-  healthCheck: () => api.get('/jobs/live/health'),
-
-  prewarm: () => api.post('/jobs/live/prewarm'),
+    axios.post<LiveJobSearchResponse>(`${JOB_FINDER_URL}/api/v1/jobs/live`, request),
+  
+  healthCheck: () => axios.get(`${JOB_FINDER_URL}/api/v1/jobs/live/health`),
+  
+  prewarm: () => axios.post(`${JOB_FINDER_URL}/api/v1/jobs/live/prewarm`),
 };
 
 export const matchApi = {
