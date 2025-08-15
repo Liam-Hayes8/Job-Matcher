@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Typography,
   Button,
@@ -16,7 +16,7 @@ import {
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useSnackbar } from 'notistack';
-import { matchApi, setAuthToken, JobMatch } from '../services/api';
+import { matchApi, liveJobApi, setAuthToken, JobMatch, LiveJobSearchRequest } from '../services/api';
 import { useMockAuth as useAuth } from '../contexts/MockAuthContext';
 import WorkIcon from '@mui/icons-material/Work';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
@@ -26,6 +26,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import StarIcon from '@mui/icons-material/Star';
 import LaunchIcon from '@mui/icons-material/Launch';
 import BusinessIcon from '@mui/icons-material/Business';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 const JobMatches: React.FC = () => {
   const { resumeId } = useParams<{ resumeId: string }>();
@@ -33,6 +34,8 @@ const JobMatches: React.FC = () => {
   const { getToken } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
   const [matches, setMatches] = useState<JobMatch[]>([]);
+  const [searchMetadata, setSearchMetadata] = useState<any>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const setupAuth = async () => {
@@ -42,36 +45,74 @@ const JobMatches: React.FC = () => {
     setupAuth();
   }, [getToken]);
 
-  const findMatchesMutation = useMutation({
-    mutationFn: () => matchApi.findMatches(parseInt(resumeId!), 20),
+  // Live job search mutation
+  const liveSearchMutation = useMutation({
+    mutationFn: async (request: LiveJobSearchRequest) => {
+      // Cancel any previous request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
+      // Create new abort controller
+      abortControllerRef.current = new AbortController();
+      
+      return liveJobApi.searchLiveJobs(request);
+    },
     onSuccess: (response) => {
-      setMatches(response.data);
-      enqueueSnackbar('Job matches found successfully!', { variant: 'success' });
+      setMatches(response.data.jobs);
+      setSearchMetadata(response.data.metadata);
+      enqueueSnackbar(`Found ${response.data.jobs.length} fresh job matches!`, { variant: 'success' });
     },
     onError: (error: any) => {
-      console.error('Failed to find matches:', error);
-      enqueueSnackbar(
-        error.response?.data?.detail || 'Failed to find job matches', 
-        { variant: 'error' }
-      );
+      if (error.name === 'AbortError') {
+        enqueueSnackbar('Search cancelled', { variant: 'info' });
+      } else {
+        console.error('Failed to find live matches:', error);
+        enqueueSnackbar(
+          error.response?.data?.detail || 'Failed to find live job matches', 
+          { variant: 'error' }
+        );
+      }
     },
   });
 
+  // Legacy matches query (fallback)
   const { data: existingMatches, isLoading, error } = useQuery({
     queryKey: ['matches', resumeId],
     queryFn: () => matchApi.getMatches(parseInt(resumeId!)).then(res => res.data),
-    enabled: !!resumeId,
+    enabled: !!resumeId && !liveSearchMutation.isPending,
   });
 
   // Update matches when data changes
   React.useEffect(() => {
-    if (existingMatches && existingMatches.length > 0) {
+    if (existingMatches && existingMatches.length > 0 && !liveSearchMutation.isPending) {
       setMatches(existingMatches);
     }
-  }, [existingMatches]);
+  }, [existingMatches, liveSearchMutation.isPending]);
 
-  const handleFindMatches = () => {
-    findMatchesMutation.mutate();
+  const handleFindLiveMatches = () => {
+    // For now, we'll use a sample resume text
+    // In production, this would come from the parsed resume
+    const sampleResumeText = `
+      Software Engineer with 5+ years of experience in Python, JavaScript, and React.
+      Experience with FastAPI, PostgreSQL, Docker, and AWS. Strong background in
+      full-stack development and cloud architecture.
+    `;
+    
+    const request: LiveJobSearchRequest = {
+      resume_text: sampleResumeText,
+      location: "US",
+      max_jobs: 20,
+      timeout: 12
+    };
+    
+    liveSearchMutation.mutate(request);
+  };
+
+  const handleCancelSearch = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
   };
 
   const getScoreColor = (score: number) => {
@@ -122,41 +163,77 @@ const JobMatches: React.FC = () => {
         <Typography variant="h4" sx={{ flexGrow: 1 }}>
           Job Matches
         </Typography>
-        <Button
-          variant="contained"
-          onClick={handleFindMatches}
-          disabled={findMatchesMutation.isPending}
-          startIcon={<SearchIcon />}
-        >
-          {findMatchesMutation.isPending ? 'Finding Matches...' : 'Find New Matches'}
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          {liveSearchMutation.isPending ? (
+            <Button
+              variant="outlined"
+              onClick={handleCancelSearch}
+              startIcon={<RefreshIcon />}
+              color="warning"
+            >
+              Cancel Search
+            </Button>
+          ) : (
+            <Button
+              variant="contained"
+              onClick={handleFindLiveMatches}
+              disabled={liveSearchMutation.isPending}
+              startIcon={<SearchIcon />}
+            >
+              Find Live Jobs
+            </Button>
+          )}
+        </Box>
       </Box>
 
-      {findMatchesMutation.isPending && (
+      {/* Search metadata */}
+      {searchMetadata && (
+        <Paper sx={{ p: 2, mb: 3, bgcolor: 'primary.50' }}>
+          <Typography variant="subtitle2" gutterBottom>
+            Search Results
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+            <Typography variant="body2">
+              <strong>{searchMetadata.returned}</strong> jobs returned
+            </Typography>
+            <Typography variant="body2">
+              <strong>{searchMetadata.valid_links}</strong> valid links
+            </Typography>
+            <Typography variant="body2">
+              <strong>{searchMetadata.sources_queried}</strong> sources queried
+            </Typography>
+            <Typography variant="body2">
+              <strong>{searchMetadata.duration_seconds}s</strong> search time
+            </Typography>
+          </Box>
+        </Paper>
+      )}
+
+      {liveSearchMutation.isPending && (
         <Box sx={{ mb: 3 }}>
           <LinearProgress />
           <Typography variant="body2" align="center" sx={{ mt: 1 }}>
-            Analyzing your resume and finding the best job matches...
+            Searching for fresh job opportunities in real-time...
           </Typography>
         </Box>
       )}
 
-      {matches.length === 0 && !findMatchesMutation.isPending && !isLoading && (
+      {matches.length === 0 && !liveSearchMutation.isPending && !isLoading && (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
           <SearchIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
           <Typography variant="h6" gutterBottom>
             No job matches found
           </Typography>
           <Typography variant="body2" color="text.secondary" gutterBottom>
-            Click "Find New Matches" to analyze your resume and find suitable job opportunities.
+            Click "Find Live Jobs" to search for fresh opportunities in real-time.
           </Typography>
           <Button
             variant="contained"
-            onClick={handleFindMatches}
+            onClick={handleFindLiveMatches}
             sx={{ mt: 2 }}
             startIcon={<SearchIcon />}
           >
-            Find New Matches
+            Find Live Jobs
           </Button>
         </Paper>
       )}

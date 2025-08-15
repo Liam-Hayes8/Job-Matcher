@@ -60,6 +60,27 @@ export interface JobMatch {
   matching_skills: string[];
 }
 
+export interface LiveJobSearchRequest {
+  resume_text: string;
+  location?: string;
+  max_jobs?: number;
+  timeout?: number;
+}
+
+export interface LiveJobSearchResponse {
+  jobs: JobMatch[];
+  metadata: {
+    total_fetched: number;
+    open_jobs: number;
+    valid_links: number;
+    unique_jobs: number;
+    returned: number;
+    duration_seconds: number;
+    sources_queried: number;
+    timestamp: string;
+  };
+}
+
 export const resumeApi = {
   uploadResume: (file: File) => {
     const formData = new FormData();
@@ -94,6 +115,15 @@ export const jobApi = {
 
   createJob: (job: Omit<JobListing, 'id' | 'created_at' | 'updated_at'>) => 
     api.post<JobListing>('/jobs/', job),
+};
+
+export const liveJobApi = {
+  searchLiveJobs: (request: LiveJobSearchRequest) => 
+    api.post<LiveJobSearchResponse>('/jobs/live', request),
+
+  healthCheck: () => api.get('/jobs/live/health'),
+
+  prewarm: () => api.post('/jobs/live/prewarm'),
 };
 
 export const matchApi = {

@@ -1,0 +1,64 @@
+# Company configurations for job source APIs
+# Maps company names to their ATS provider and slug
+
+# Tech Companies using Greenhouse
+google:
+  ats: greenhouse
+  slug: google
+
+microsoft:
+  ats: greenhouse
+  slug: microsoft
+
+amazon:
+  ats: greenhouse
+  slug: amazon
+
+meta:
+  ats: greenhouse
+  slug: meta
+
+apple:
+  ats: greenhouse
+  slug: apple
+
+netflix:
+  ats: greenhouse
+  slug: netflix
+
+# Companies using Lever
+uber:
+  ats: lever
+  slug: uber
+
+lyft:
+  ats: lever
+  slug: lyft
+
+airbnb:
+  ats: lever
+  slug: airbnb
+
+stripe:
+  ats: lever
+  slug: stripe
+
+# Companies using Ashby
+notion:
+  ats: ashby
+  slug: notion
+
+linear:
+  ats: ashby
+  slug: linear
+
+# Companies using SmartRecruiters
+salesforce:
+  ats: smartrecruiters
+  slug: salesforce
+
+# Add more companies as needed
+# Format:
+# company_name:
+#   ats: greenhouse|lever|ashby|smartrecruiters
+#   slug: company_slug_in_ats
