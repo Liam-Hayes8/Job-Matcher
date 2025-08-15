@@ -17,13 +17,15 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useSnackbar } from 'notistack';
 import { matchApi, setAuthToken, JobMatch } from '../services/api';
-import { useAuth } from '../contexts/AuthContext';
+import { useMockAuth as useAuth } from '../contexts/MockAuthContext';
 import WorkIcon from '@mui/icons-material/Work';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SearchIcon from '@mui/icons-material/Search';
 import StarIcon from '@mui/icons-material/Star';
+import LaunchIcon from '@mui/icons-material/Launch';
+import BusinessIcon from '@mui/icons-material/Business';
 
 const JobMatches: React.FC = () => {
   const { resumeId } = useParams<{ resumeId: string }>();
@@ -59,12 +61,14 @@ const JobMatches: React.FC = () => {
     queryKey: ['matches', resumeId],
     queryFn: () => matchApi.getMatches(parseInt(resumeId!)).then(res => res.data),
     enabled: !!resumeId,
-    onSuccess: (data) => {
-      if (data.length > 0) {
-        setMatches(data);
-      }
-    },
   });
+
+  // Update matches when data changes
+  React.useEffect(() => {
+    if (existingMatches && existingMatches.length > 0) {
+      setMatches(existingMatches);
+    }
+  }, [existingMatches]);
 
   const handleFindMatches = () => {
     findMatchesMutation.mutate();
@@ -78,7 +82,7 @@ const JobMatches: React.FC = () => {
 
   const getScoreIcon = (score: number) => {
     if (score >= 0.8) return <StarIcon />;
-    return null;
+    return undefined;
   };
 
   const formatSalary = (min?: number, max?: number) => {
@@ -87,6 +91,14 @@ const JobMatches: React.FC = () => {
     if (min) return `$${min.toLocaleString()}+`;
     if (max) return `Up to $${max.toLocaleString()}`;
     return 'Salary not specified';
+  };
+
+  const handleApplyClick = (url?: string) => {
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } else {
+      enqueueSnackbar('Job application link not available', { variant: 'warning' });
+    }
   };
 
   if (error) {
@@ -168,17 +180,28 @@ const JobMatches: React.FC = () => {
       ) : (
         <Grid container spacing={3}>
           {matches.map((match, index) => (
-            <Grid item xs={12} key={`${match.job_listing.id}-${index}`}>
+            <Grid item xs={12} key={`${match.id || index}-${index}`}>
               <Card sx={{ position: 'relative' }}>
                 <CardContent>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                     <Box sx={{ flexGrow: 1 }}>
                       <Typography variant="h6" gutterBottom>
-                        {match.job_listing.title}
+                        {match.title}
                       </Typography>
-                      <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-                        {match.job_listing.company}
-                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                        <BusinessIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                        <Typography variant="subtitle1" color="text.secondary">
+                          {match.company}
+                        </Typography>
+                        {match.source && (
+                          <Chip
+                            label={match.source}
+                            size="small"
+                            variant="outlined"
+                            color="secondary"
+                          />
+                        )}
+                      </Box>
                     </Box>
                     <Chip
                       label={`${Math.round(match.match_score * 100)}% Match`}
@@ -189,36 +212,36 @@ const JobMatches: React.FC = () => {
                   </Box>
 
                   <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-                    {match.job_listing.location && (
+                    {match.location && (
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <LocationOnIcon sx={{ fontSize: 16, mr: 0.5, color: 'text.secondary' }} />
                         <Typography variant="body2">
-                          {match.job_listing.location}
+                          {match.location}
                         </Typography>
                       </Box>
                     )}
                     
-                    {match.job_listing.job_type && (
+                    {match.job_type && (
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <WorkIcon sx={{ fontSize: 16, mr: 0.5, color: 'text.secondary' }} />
                         <Typography variant="body2">
-                          {match.job_listing.job_type}
+                          {match.job_type}
                         </Typography>
                       </Box>
                     )}
 
-                    {(match.job_listing.salary_min || match.job_listing.salary_max) && (
+                    {(match.salary_min || match.salary_max) && (
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <AttachMoneyIcon sx={{ fontSize: 16, mr: 0.5, color: 'text.secondary' }} />
                         <Typography variant="body2">
-                          {formatSalary(match.job_listing.salary_min, match.job_listing.salary_max)}
+                          {formatSalary(match.salary_min, match.salary_max)}
                         </Typography>
                       </Box>
                     )}
 
-                    {match.job_listing.remote && (
+                    {match.remote && (
                       <Chip
-                        label={match.job_listing.remote}
+                        label={match.remote}
                         size="small"
                         variant="outlined"
                       />
@@ -228,14 +251,14 @@ const JobMatches: React.FC = () => {
                   <Divider sx={{ my: 2 }} />
 
                   <Typography variant="body2" paragraph>
-                    {match.job_listing.description.length > 300
-                      ? `${match.job_listing.description.substring(0, 300)}...`
-                      : match.job_listing.description
+                    {match.description.length > 300
+                      ? `${match.description.substring(0, 300)}...`
+                      : match.description
                     }
                   </Typography>
 
                   {match.matching_skills.length > 0 && (
-                    <Box>
+                    <Box sx={{ mb: 2 }}>
                       <Typography variant="subtitle2" gutterBottom>
                         Matching Skills:
                       </Typography>
@@ -259,6 +282,18 @@ const JobMatches: React.FC = () => {
                       </Box>
                     </Box>
                   )}
+
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={() => handleApplyClick(match.url)}
+                      startIcon={<LaunchIcon />}
+                      disabled={!match.url}
+                    >
+                      {match.url ? 'Apply Now' : 'Link Unavailable'}
+                    </Button>
+                  </Box>
                 </CardContent>
               </Card>
             </Grid>

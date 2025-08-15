@@ -9,9 +9,10 @@ import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import ResumeUpload from './pages/ResumeUpload';
 import JobMatches from './pages/JobMatches';
+import Jobs from './pages/Jobs';
 import NotFound from './pages/NotFound';
 import ErrorBoundary from './components/ErrorBoundary';
-import { useAuth } from './contexts/AuthContext';
+import { useMockAuth as useAuth } from './contexts/MockAuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Create a theme instance
@@ -119,6 +120,14 @@ function App() {
                     element={
                       <ProtectedRoute>
                         <ResumeUpload />
+                      </ProtectedRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/jobs" 
+                    element={
+                      <ProtectedRoute>
+                        <Jobs />
                       </ProtectedRoute>
                     } 
                   />

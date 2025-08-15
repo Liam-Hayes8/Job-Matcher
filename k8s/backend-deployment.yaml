@@ -30,14 +30,23 @@ spec:
         - name: DB_NAME
           value: "job-matcher"
         - name: DB_USER
-          value: "job_matcher_user"
+          value: "job_matcher_iam_user"  # IAM user for authentication
         - name: RESUME_BUCKET_NAME
           value: "PROJECT_ID-job-matcher-resumes"
         envFrom:
         - configMapRef:
             name: job-matcher-config
-        - secretRef:
-            name: job-matcher-secrets
+        volumeMounts:
+        - name: secrets-store-inline
+          mountPath: "/secrets"
+          readOnly: true
+        volumes:
+        - name: secrets-store-inline
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "job-matcher-secrets"
         resources:
           requests:
             memory: "512Mi"

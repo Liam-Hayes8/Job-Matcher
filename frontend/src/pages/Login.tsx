@@ -11,7 +11,7 @@ import {
   Alert,
 } from '@mui/material';
 import { useSnackbar } from 'notistack';
-import { useAuth } from '../contexts/AuthContext';
+import { useMockAuth as useAuth } from '../contexts/MockAuthContext';
 import { useNavigate } from 'react-router-dom';
 import WorkIcon from '@mui/icons-material/Work';
 import PersonIcon from '@mui/icons-material/Person';

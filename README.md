@@ -9,6 +9,7 @@ A full-stack Resume Parser + Job Matcher application deployed on Google Cloud Pl
 - **Backend**: Python FastAPI application with ML-powered resume parsing and job matching
 - **Frontend**: React SPA with Firebase Authentication
 - **Functions**: Cloud Function for bursty PDF-to-JSON resume processing
+- **Job Finder**: Cloud Run microservice for live job matching with ATS integration
 - **Storage**: Artifact Registry for container images, Secret Manager for sensitive data
 - **CI/CD**: GitHub Actions with OIDC authentication for automated deployments
 - **Observability**: Cloud Logging/Monitoring with managed Prometheus
@@ -17,7 +18,8 @@ A full-stack Resume Parser + Job Matcher application deployed on Google Cloud Pl
 
 - 🔐 **Firebase Authentication** - Secure user authentication
 - 📄 **Resume Parsing** - AI-powered extraction of skills, experience, and contact info
-- 🎯 **Job Matching** - ML algorithms to match resumes with relevant job opportunities
+- 🎯 **Live Job Matching** - Real-time job matching with ATS integration and AI embeddings
+- 🔄 **ATS Integration** - Direct integration with Greenhouse, Lever, Ashby, SmartRecruiters, and Adzuna
 - ⚡ **Serverless Processing** - Cloud Functions for scalable document processing
 - 📊 **Monitoring** - Comprehensive observability with Prometheus metrics
 - 🚀 **Auto-scaling** - Kubernetes HPA for dynamic scaling based on load
@@ -45,7 +47,11 @@ gcloud services enable \
   compute.googleapis.com \
   servicenetworking.googleapis.com \
   monitoring.googleapis.com \
-  logging.googleapis.com
+  logging.googleapis.com \
+  aiplatform.googleapis.com \
+  run.googleapis.com \
+  cloudscheduler.googleapis.com \
+  vpcaccess.googleapis.com
 ```
 
 ## Quick Start
@@ -97,11 +103,17 @@ terraform apply
 # Run the setup script
 ./scripts/setup-secrets.sh your-project-id us-west2
 
+# Setup Job Finder Service
+./scripts/setup-job-finder.sh your-project-id us-west2
+
 # Add your Firebase config
 gcloud secrets versions add job-matcher-firebase-config --data-file=path/to/firebase-config.json
 
 # Set database password
 echo 'your-secure-db-password' | gcloud secrets versions add job-matcher-db-password --data-file=-
+
+# Configure ATS API keys (optional but recommended for live job matching)
+gcloud secrets versions add job-matcher-ats-api-keys --data-file=path/to/ats-keys.json
 ```
 
 ### 6. Configure GitHub Actions

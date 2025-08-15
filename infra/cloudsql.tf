@@ -67,6 +67,27 @@ resource "google_sql_database" "database" {
   instance = google_sql_database_instance.postgres.name
 }
 
+# IAM database user for service account authentication
+resource "google_sql_user" "iam_user" {
+  name     = "job-matcher-app@time-tracker-1747631762.iam"
+  instance = google_sql_database_instance.postgres.name
+  type     = "CLOUD_IAM_SERVICE_ACCOUNT"
+}
+
+# Service account for database access
+resource "google_service_account" "db_user" {
+  account_id   = "${var.app_name}-db-user"
+  display_name = "Database user service account"
+}
+
+# Grant IAM database user role to service account
+resource "google_project_iam_member" "db_user" {
+  project = var.project_id
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.db_user.email}"
+}
+
+# Legacy password user for backward compatibility (can be removed later)
 resource "google_sql_user" "user" {
   name     = "${var.app_name}_user"
   instance = google_sql_database_instance.postgres.name

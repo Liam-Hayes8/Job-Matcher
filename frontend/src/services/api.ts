@@ -27,7 +27,7 @@ export interface Resume {
 }
 
 export interface JobListing {
-  id: number;
+  id: string | number;
   title: string;
   company: string;
   description: string;
@@ -37,12 +37,25 @@ export interface JobListing {
   salary_max?: number;
   job_type?: string;
   remote?: string;
-  created_at: string;
+  url?: string;
+  source?: string;
+  skills_required?: string[];
+  created_at?: string;
   updated_at?: string;
 }
 
 export interface JobMatch {
-  job_listing: JobListing;
+  id?: string | number;
+  title: string;
+  company: string;
+  description: string;
+  location?: string;
+  salary_min?: number;
+  salary_max?: number;
+  job_type?: string;
+  remote?: string;
+  url?: string;
+  source?: string;
   match_score: number;
   matching_skills: string[];
 }

@@ -53,12 +53,19 @@ jobs:
         docker build -t "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/frontend:$GITHUB_SHA" ./frontend
         docker build -t "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/frontend:latest" ./frontend
 
+    - name: Build Job Finder Docker image
+      run: |
+        docker build -t "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/job-finder:$GITHUB_SHA" ./job-finder
+        docker build -t "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/job-finder:latest" ./job-finder
+
     - name: Push Docker images
       run: |
         docker push "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/backend:$GITHUB_SHA"
         docker push "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/backend:latest"
         docker push "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/frontend:$GITHUB_SHA"
         docker push "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/frontend:latest"
+        docker push "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/job-finder:$GITHUB_SHA"
+        docker push "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/job-finder:latest"
 
     - name: Deploy Cloud Function
       if: github.ref == 'refs/heads/main'
@@ -74,6 +81,22 @@ jobs:
           --service-account=job-matcher-function@$PROJECT_ID.iam.gserviceaccount.com \
           --set-env-vars PROJECT_ID=$PROJECT_ID
 
+    - name: Deploy Job Finder to Cloud Run
+      if: github.ref == 'refs/heads/main'
+      run: |
+        gcloud run deploy job-finder \
+          --image=$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/job-finder:$GITHUB_SHA \
+          --region=$REGION \
+          --platform=managed \
+          --allow-unauthenticated \
+          --memory=2Gi \
+          --cpu=1 \
+          --max-instances=10 \
+          --min-instances=1 \
+          --port=8000 \
+          --set-env-vars PROJECT_ID=$PROJECT_ID \
+          --service-account=job-matcher-app@$PROJECT_ID.iam.gserviceaccount.com
+
     - name: Update Kubernetes manifests
       if: github.ref == 'refs/heads/main'
       run: |
@@ -88,6 +111,7 @@ jobs:
         kubectl apply -f k8s/namespace.yaml
         kubectl apply -f k8s/configmap.yaml
         kubectl apply -f k8s/serviceaccount.yaml
+        kubectl apply -f k8s/secret-provider-class.yaml
         kubectl apply -f k8s/backend-service.yaml
         kubectl apply -f k8s/frontend-service.yaml
         kubectl apply -f k8s/backend-deployment.yaml

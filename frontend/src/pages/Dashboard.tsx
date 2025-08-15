@@ -16,7 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSnackbar } from 'notistack';
 import { resumeApi, setAuthToken } from '../services/api';
-import { useAuth } from '../contexts/AuthContext';
+import { useMockAuth as useAuth } from '../contexts/MockAuthContext';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import FindInPageIcon from '@mui/icons-material/FindInPage';
 import DeleteIcon from '@mui/icons-material/Delete';

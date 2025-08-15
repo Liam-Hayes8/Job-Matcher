@@ -124,4 +124,34 @@ class ResumeService:
             logger.error(f"Failed to get matching jobs: {e}")
             return []
 
+    async def get_live_job_matches(self, resume_text: str, location: str = "US", limit: int = 20) -> List[Dict[str, Any]]:
+        """Get live job matches from the job finder service"""
+        try:
+            import httpx
+            from app.core.config import settings
+            
+            # Get job finder service URL from environment
+            job_finder_url = getattr(settings, 'JOB_FINDER_URL', 'http://localhost:8000')
+            
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    f"{job_finder_url}/jobs/live",
+                    json={
+                        "resume_text": resume_text,
+                        "location": location,
+                        "limit": limit,
+                        "days": 7
+                    }
+                )
+                
+                if response.status_code == 200:
+                    return response.json()
+                else:
+                    logger.error(f"Job finder service error: {response.status_code} - {response.text}")
+                    return []
+                    
+        except Exception as e:
+            logger.error(f"Failed to get live job matches: {e}")
+            return []
+
 resume_service = ResumeService()

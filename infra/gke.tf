@@ -29,6 +29,7 @@ resource "google_container_cluster" "primary" {
     horizontal_pod_autoscaling {
       disabled = false
     }
+
   }
 
   monitoring_config {

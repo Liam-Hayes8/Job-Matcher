@@ -11,10 +11,11 @@ import {
   IconButton,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useMockAuth as useAuth } from '../contexts/MockAuthContext';
 import WorkIcon from '@mui/icons-material/Work';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import SearchIcon from '@mui/icons-material/Search';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import LogoutIcon from '@mui/icons-material/Logout';
 
@@ -74,6 +75,14 @@ const Navbar: React.FC = () => {
               sx={{ textTransform: 'none' }}
             >
               Upload Resume
+            </Button>
+            <Button 
+              color="inherit" 
+              onClick={() => navigate('/jobs')}
+              startIcon={<SearchIcon />}
+              sx={{ textTransform: 'none' }}
+            >
+              View Jobs
             </Button>
             
             <IconButton

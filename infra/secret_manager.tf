@@ -60,12 +60,42 @@ resource "google_secret_manager_secret_iam_member" "jwt_secret_access" {
   member    = "serviceAccount:${google_service_account.app_service_account.email}"
 }
 
-resource "google_service_account_iam_binding" "workload_identity_binding" {
-  service_account_id = google_service_account.app_service_account.name
-  role               = "roles/iam.workloadIdentityUser"
+# Workload identity binding will be configured after GKE cluster is created
+# resource "google_service_account_iam_binding" "workload_identity_binding" {
+#   service_account_id = google_service_account.app_service_account.name
+#   role               = "roles/iam.workloadIdentityUser"
+#
+#   members = [
+#     "serviceAccount:${var.project_id}.svc.id.goog[default/job-matcher-backend]",
+#     "serviceAccount:${var.project_id}.svc.id.goog[default/job-matcher-frontend]"
+#   ]
+# }
 
-  members = [
-    "serviceAccount:${var.project_id}.svc.id.goog[default/job-matcher-backend]",
-    "serviceAccount:${var.project_id}.svc.id.goog[default/job-matcher-frontend]"
-  ]
+# Additional secrets for job finder service
+resource "google_secret_manager_secret" "vertex_ai_key" {
+  secret_id = "${var.app_name}-vertex-ai-key"
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret" "ats_api_keys" {
+  secret_id = "${var.app_name}-ats-api-keys"
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_iam_member" "vertex_ai_key_access" {
+  secret_id = google_secret_manager_secret.vertex_ai_key.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.app_service_account.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "ats_api_keys_access" {
+  secret_id = google_secret_manager_secret.ats_api_keys.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.app_service_account.email}"
 }
