@@ -12,6 +12,10 @@ import {
   Paper,
   Skeleton,
   Divider,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -27,6 +31,9 @@ import StarIcon from '@mui/icons-material/Star';
 import LaunchIcon from '@mui/icons-material/Launch';
 import BusinessIcon from '@mui/icons-material/Business';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import SchoolIcon from '@mui/icons-material/School';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 const JobMatches: React.FC = () => {
   const { resumeId } = useParams<{ resumeId: string }>();
@@ -161,7 +168,7 @@ const JobMatches: React.FC = () => {
           Back to Dashboard
         </Button>
         <Typography variant="h4" sx={{ flexGrow: 1 }}>
-          Job Matches
+          Internship Matches
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
           {liveSearchMutation.isPending ? (
@@ -213,7 +220,7 @@ const JobMatches: React.FC = () => {
         <Box sx={{ mb: 3 }}>
           <LinearProgress />
           <Typography variant="body2" align="center" sx={{ mt: 1 }}>
-            Searching for fresh job opportunities in real-time...
+            Searching for fresh internship opportunities in real-time...
           </Typography>
         </Box>
       )}
@@ -222,10 +229,10 @@ const JobMatches: React.FC = () => {
         <Paper sx={{ p: 4, textAlign: 'center' }}>
           <SearchIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
           <Typography variant="h6" gutterBottom>
-            No job matches found
+            No internship matches found
           </Typography>
           <Typography variant="body2" color="text.secondary" gutterBottom>
-            Click "Find Live Jobs" to search for fresh opportunities in real-time.
+            Click "Find Live Jobs" to search for fresh internship opportunities in real-time.
           </Typography>
           <Button
             variant="contained"
@@ -316,6 +323,16 @@ const JobMatches: React.FC = () => {
                       </Box>
                     )}
 
+                    {/* Internship Duration */}
+                    {(match as any).duration && (
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <ScheduleIcon sx={{ fontSize: 16, mr: 0.5, color: 'text.secondary' }} />
+                        <Typography variant="body2">
+                          {(match as any).duration}
+                        </Typography>
+                      </Box>
+                    )}
+
                     {match.remote && (
                       <Chip
                         label={match.remote}
@@ -360,6 +377,37 @@ const JobMatches: React.FC = () => {
                     </Box>
                   )}
 
+                  {/* Internship Requirements */}
+                  {(match as any).requirements && (match as any).requirements.length > 0 && (
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                        <SchoolIcon sx={{ fontSize: 16, mr: 0.5 }} />
+                        Requirements:
+                      </Typography>
+                      <List dense sx={{ py: 0 }}>
+                        {(match as any).requirements.slice(0, 3).map((requirement: string, reqIndex: number) => (
+                          <ListItem key={reqIndex} sx={{ py: 0.5, px: 0 }}>
+                            <ListItemIcon sx={{ minWidth: 24 }}>
+                              <CheckCircleIcon sx={{ fontSize: 16, color: 'primary.main' }} />
+                            </ListItemIcon>
+                            <ListItemText 
+                              primary={requirement}
+                              primaryTypographyProps={{ variant: 'body2' }}
+                            />
+                          </ListItem>
+                        ))}
+                        {(match as any).requirements.length > 3 && (
+                          <ListItem sx={{ py: 0.5, px: 0 }}>
+                            <ListItemText 
+                              primary={`+${(match as any).requirements.length - 3} more requirements`}
+                              primaryTypographyProps={{ variant: 'body2', color: 'text.secondary' }}
+                            />
+                          </ListItem>
+                        )}
+                      </List>
+                    </Box>
+                  )}
+
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
                     <Button
                       variant="contained"
@@ -380,9 +428,9 @@ const JobMatches: React.FC = () => {
 
       {matches.length > 0 && (
         <Box sx={{ mt: 4, textAlign: 'center' }}>
-          <Typography variant="body2" color="text.secondary">
-            Found {matches.length} job matches for your resume
-          </Typography>
+                  <Typography variant="body2" color="text.secondary">
+          Found {matches.length} internship matches for your resume
+        </Typography>
         </Box>
       )}
     </Box>

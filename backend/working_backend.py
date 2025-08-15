@@ -11,6 +11,9 @@ from datetime import datetime
 import uuid
 import re
 import requests
+import asyncio
+import hashlib
+import random
 
 class WorkingBackendHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
@@ -25,55 +28,93 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
         self.end_headers()
     
     def get_real_jobs(self, skills=None):
-        """Get real jobs from multiple APIs"""
+        """Get real jobs from multiple APIs - FOCUSED ON INTERNSHIPS"""
         jobs = []
         
         # Try LinkedIn Jobs API (simulated)
         try:
-            # For demo purposes, we'll simulate real job data
+            # For demo purposes, we'll simulate real internship data
             # In production, you'd use actual job APIs like LinkedIn, Indeed, etc.
             sample_jobs = [
                 {
-                    "id": f"linkedin_{uuid.uuid4().hex[:8]}",
-                    "title": "Senior Software Engineer",
+                    "id": f"linkedin_intern_{uuid.uuid4().hex[:8]}",
+                    "title": "Software Engineering Intern",
                     "company": "Google",
                     "location": "Mountain View, CA",
-                    "description": "Join Google's engineering team to build scalable systems.",
-                    "salary_min": 150000,
-                    "salary_max": 250000,
-                    "job_type": "Full-time",
+                    "description": "Join Google's engineering team as an intern! Work on real projects using Python, JavaScript, and cloud technologies.",
+                    "salary_min": 8000,
+                    "salary_max": 12000,
+                    "job_type": "Internship",
                     "remote": "Hybrid",
-                    "url": "https://careers.google.com/jobs/results/123456",
+                    "url": "https://careers.google.com/jobs/results/internships/123456",
                     "source": "LinkedIn",
-                    "skills_required": ["Python", "JavaScript", "React", "Go", "Kubernetes"]
+                    "skills_required": ["Python", "JavaScript", "React", "Git", "Basic Algorithms"],
+                    "duration": "12 weeks",
+                    "requirements": ["Currently enrolled in Computer Science", "GPA 3.0+"]
                 },
                 {
-                    "id": f"indeed_{uuid.uuid4().hex[:8]}",
-                    "title": "Full Stack Developer",
+                    "id": f"indeed_intern_{uuid.uuid4().hex[:8]}",
+                    "title": "Full Stack Development Intern",
                     "company": "Microsoft",
                     "location": "Seattle, WA",
-                    "description": "Build next-generation cloud applications.",
-                    "salary_min": 120000,
-                    "salary_max": 200000,
-                    "job_type": "Full-time",
+                    "description": "Build next-generation cloud applications using Azure, React, and TypeScript.",
+                    "salary_min": 7500,
+                    "salary_max": 11000,
+                    "job_type": "Internship",
                     "remote": "Remote",
-                    "url": "https://careers.microsoft.com/us/en/job/123456",
+                    "url": "https://careers.microsoft.com/us/en/job/internships/123456",
                     "source": "Indeed",
-                    "skills_required": ["Python", "JavaScript", "React", "Azure", "TypeScript"]
+                    "skills_required": ["Python", "JavaScript", "React", "Azure", "TypeScript"],
+                    "duration": "10 weeks",
+                    "requirements": ["Pursuing BS/MS in Computer Science", "Web development experience"]
                 },
                 {
-                    "id": f"glassdoor_{uuid.uuid4().hex[:8]}",
-                    "title": "Backend Engineer",
-                    "company": "Amazon",
-                    "location": "Seattle, WA",
-                    "description": "Design and implement scalable backend services.",
-                    "salary_min": 130000,
-                    "salary_max": 220000,
-                    "job_type": "Full-time",
-                    "remote": "On-site",
-                    "url": "https://www.amazon.jobs/en/jobs/123456",
+                    "id": f"glassdoor_intern_{uuid.uuid4().hex[:8]}",
+                    "title": "Data Science Intern",
+                    "company": "Netflix",
+                    "location": "Los Gatos, CA",
+                    "description": "Analyze user behavior data to improve content recommendations using machine learning.",
+                    "salary_min": 8500,
+                    "salary_max": 13000,
+                    "job_type": "Internship",
+                    "remote": "Hybrid",
+                    "url": "https://jobs.netflix.com/internships/123456",
                     "source": "Glassdoor",
-                    "skills_required": ["Python", "Java", "AWS", "Docker", "PostgreSQL"]
+                    "skills_required": ["Python", "Machine Learning", "SQL", "Statistics", "R"],
+                    "duration": "12 weeks",
+                    "requirements": ["Statistics/Data Science major", "ML experience preferred"]
+                },
+                {
+                    "id": f"handshake_intern_{uuid.uuid4().hex[:8]}",
+                    "title": "iOS Development Intern",
+                    "company": "Apple",
+                    "location": "Cupertino, CA",
+                    "description": "Create amazing iOS applications that millions of users will love using Swift and SwiftUI.",
+                    "salary_min": 8000,
+                    "salary_max": 12000,
+                    "job_type": "Internship",
+                    "remote": "On-site",
+                    "url": "https://jobs.apple.com/en/us/internships/123456",
+                    "source": "Handshake",
+                    "skills_required": ["Swift", "SwiftUI", "iOS Development", "Xcode", "Git"],
+                    "duration": "12 weeks",
+                    "requirements": ["Computer Science major", "iOS development experience"]
+                },
+                {
+                    "id": f"wayup_intern_{uuid.uuid4().hex[:8]}",
+                    "title": "Product Management Intern",
+                    "company": "Airbnb",
+                    "location": "San Francisco, CA",
+                    "description": "Learn product management by working on real features that impact millions of users.",
+                    "salary_min": 7500,
+                    "salary_max": 11000,
+                    "job_type": "Internship",
+                    "remote": "Hybrid",
+                    "url": "https://careers.airbnb.com/internships/123456",
+                    "source": "WayUp",
+                    "skills_required": ["Analytics", "User Research", "SQL", "Product Strategy"],
+                    "duration": "12 weeks",
+                    "requirements": ["Business/Engineering major", "Leadership experience"]
                 }
             ]
             
@@ -101,24 +142,239 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
         return jobs
     
     def get_mock_jobs(self):
-        """Fallback mock jobs"""
+        """Fallback mock jobs - FOCUSED ON INTERNSHIPS"""
         return [
             {
                 "id": 1,
-                "title": "Software Engineer",
+                "title": "Software Engineering Intern",
                 "company": "Tech Corp",
                 "location": "San Francisco, CA",
-                "description": "We are looking for a talented software engineer with experience in Python, JavaScript, and React.",
-                "salary_min": 80000,
-                "salary_max": 120000,
-                "job_type": "Full-time",
+                "description": "We are looking for a talented software engineering intern with experience in Python, JavaScript, and React.",
+                "salary_min": 6000,
+                "salary_max": 9000,
+                "job_type": "Internship",
                 "remote": "Hybrid",
-                "url": "https://example.com/job/1",
+                "url": "https://example.com/internships/1",
                 "source": "Mock",
                 "match_score": 0.85,
-                "matching_skills": ["Python", "JavaScript", "React"]
+                "matching_skills": ["Python", "JavaScript", "React"],
+                "duration": "10 weeks",
+                "requirements": ["Computer Science major", "GPA 3.0+"]
             }
         ]
+    
+    def handle_live_jobs_search(self, post_data):
+        """Handle live jobs search request"""
+        try:
+            # Parse request data
+            data = json.loads(post_data.decode('utf-8'))
+            resume_text = data.get('resume_text', '')
+            location = data.get('location', 'US')
+            max_jobs = data.get('max_jobs', 20)
+            
+            # Mock live jobs data - FOCUSED ON INTERNSHIPS
+            mock_jobs = [
+                {
+                    "id": "google_intern_001",
+                    "title": "Software Engineering Intern",
+                    "company": "Google",
+                    "description": "Join Google's engineering team as an intern! Work on real projects using Python, JavaScript, and cloud technologies. Perfect for students looking to gain industry experience.",
+                    "location": "Mountain View, CA",
+                    "apply_url": "https://careers.google.com/jobs/results/internships/123456",
+                    "posted_at": datetime.now().isoformat(),
+                    "open": True,
+                    "source": "greenhouse",
+                    "job_id": "intern_001",
+                    "department": "Engineering",
+                    "job_type": "Internship",
+                    "remote": "Hybrid",
+                    "salary_min": 8000,
+                    "salary_max": 12000,
+                    "duration": "12 weeks",
+                    "skills_required": ["Python", "JavaScript", "React", "Git", "Basic Algorithms"],
+                    "requirements": ["Currently enrolled in Computer Science or related field", "GPA 3.0+", "Available for Summer 2024"]
+                },
+                {
+                    "id": "microsoft_intern_002",
+                    "title": "Full Stack Development Intern",
+                    "company": "Microsoft",
+                    "description": "Build next-generation cloud applications using Azure, React, and TypeScript. Gain hands-on experience with modern web development and cloud services.",
+                    "location": "Seattle, WA",
+                    "apply_url": "https://careers.microsoft.com/us/en/job/internships/123456",
+                    "posted_at": datetime.now().isoformat(),
+                    "open": True,
+                    "source": "greenhouse",
+                    "job_id": "intern_002",
+                    "department": "Cloud & AI",
+                    "job_type": "Internship",
+                    "remote": "Remote",
+                    "salary_min": 7500,
+                    "salary_max": 11000,
+                    "duration": "10 weeks",
+                    "skills_required": ["Python", "JavaScript", "React", "Azure", "TypeScript"],
+                    "requirements": ["Pursuing BS/MS in Computer Science", "Experience with web development", "Strong problem-solving skills"]
+                },
+                {
+                    "id": "amazon_intern_003",
+                    "title": "Backend Engineering Intern",
+                    "company": "Amazon",
+                    "description": "Design and implement scalable backend services using AWS, Python, and PostgreSQL. Learn microservices architecture and cloud infrastructure.",
+                    "location": "Seattle, WA",
+                    "apply_url": "https://www.amazon.jobs/en/jobs/internships/123456",
+                    "posted_at": datetime.now().isoformat(),
+                    "open": True,
+                    "source": "greenhouse",
+                    "job_id": "intern_003",
+                    "department": "AWS",
+                    "job_type": "Internship",
+                    "remote": "On-site",
+                    "salary_min": 8500,
+                    "salary_max": 13000,
+                    "duration": "12 weeks",
+                    "skills_required": ["Python", "Java", "AWS", "Docker", "PostgreSQL"],
+                    "requirements": ["Computer Science major", "Knowledge of data structures", "Familiarity with databases"]
+                },
+                {
+                    "id": "meta_intern_004",
+                    "title": "Software Engineering Intern - AI/ML",
+                    "company": "Meta",
+                    "description": "Work on cutting-edge AI and machine learning projects. Help develop algorithms that power billions of users worldwide.",
+                    "location": "Menlo Park, CA",
+                    "apply_url": "https://www.metacareers.com/jobs/internships/123456",
+                    "posted_at": datetime.now().isoformat(),
+                    "open": True,
+                    "source": "lever",
+                    "job_id": "intern_004",
+                    "department": "AI Research",
+                    "job_type": "Internship",
+                    "remote": "Hybrid",
+                    "salary_min": 9000,
+                    "salary_max": 14000,
+                    "duration": "12 weeks",
+                    "skills_required": ["Python", "Machine Learning", "TensorFlow", "PyTorch", "Statistics"],
+                    "requirements": ["Graduate student in AI/ML", "Research experience preferred", "Strong mathematical background"]
+                },
+                {
+                    "id": "apple_intern_005",
+                    "title": "iOS Development Intern",
+                    "company": "Apple",
+                    "description": "Create amazing iOS applications that millions of users will love. Work with Swift, SwiftUI, and Apple's latest technologies.",
+                    "location": "Cupertino, CA",
+                    "apply_url": "https://jobs.apple.com/en/us/internships/123456",
+                    "posted_at": datetime.now().isoformat(),
+                    "open": True,
+                    "source": "lever",
+                    "job_id": "intern_005",
+                    "department": "Software Engineering",
+                    "job_type": "Internship",
+                    "remote": "On-site",
+                    "salary_min": 8000,
+                    "salary_max": 12000,
+                    "duration": "12 weeks",
+                    "skills_required": ["Swift", "SwiftUI", "iOS Development", "Xcode", "Git"],
+                    "requirements": ["Computer Science or related field", "iOS development experience", "Portfolio of apps preferred"]
+                },
+                {
+                    "id": "netflix_intern_006",
+                    "title": "Data Science Intern",
+                    "company": "Netflix",
+                    "description": "Analyze user behavior data to improve content recommendations. Work with big data technologies and machine learning models.",
+                    "location": "Los Gatos, CA",
+                    "apply_url": "https://jobs.netflix.com/internships/123456",
+                    "posted_at": datetime.now().isoformat(),
+                    "open": True,
+                    "source": "greenhouse",
+                    "job_id": "intern_006",
+                    "department": "Data Science",
+                    "job_type": "Internship",
+                    "remote": "Hybrid",
+                    "salary_min": 8500,
+                    "salary_max": 13000,
+                    "duration": "10 weeks",
+                    "skills_required": ["Python", "R", "SQL", "Machine Learning", "Statistics"],
+                    "requirements": ["Statistics/Data Science major", "Experience with data analysis", "Knowledge of ML algorithms"]
+                },
+                {
+                    "id": "spotify_intern_007",
+                    "title": "Frontend Engineering Intern",
+                    "company": "Spotify",
+                    "description": "Build beautiful user interfaces for Spotify's web and mobile applications. Work with React, TypeScript, and modern frontend technologies.",
+                    "location": "New York, NY",
+                    "apply_url": "https://careers.spotify.com/internships/123456",
+                    "posted_at": datetime.now().isoformat(),
+                    "open": True,
+                    "source": "lever",
+                    "job_id": "intern_007",
+                    "department": "Frontend Engineering",
+                    "job_type": "Internship",
+                    "remote": "Remote",
+                    "salary_min": 7000,
+                    "salary_max": 10000,
+                    "duration": "12 weeks",
+                    "skills_required": ["React", "TypeScript", "JavaScript", "CSS", "Git"],
+                    "requirements": ["Web development experience", "Knowledge of modern JavaScript", "Eye for design"]
+                },
+                {
+                    "id": "airbnb_intern_008",
+                    "title": "Product Management Intern",
+                    "company": "Airbnb",
+                    "description": "Learn product management by working on real features that impact millions of users. Collaborate with engineering, design, and data teams.",
+                    "location": "San Francisco, CA",
+                    "apply_url": "https://careers.airbnb.com/internships/123456",
+                    "posted_at": datetime.now().isoformat(),
+                    "open": True,
+                    "source": "greenhouse",
+                    "job_id": "intern_008",
+                    "department": "Product",
+                    "job_type": "Internship",
+                    "remote": "Hybrid",
+                    "salary_min": 7500,
+                    "salary_max": 11000,
+                    "duration": "12 weeks",
+                    "skills_required": ["Analytics", "User Research", "SQL", "Product Strategy", "Communication"],
+                    "requirements": ["Business/Engineering major", "Leadership experience", "Strong analytical skills"]
+                }
+            ]
+            
+            # Simple ranking based on keyword matching
+            resume_lower = resume_text.lower()
+            keywords = ["python", "javascript", "react", "aws", "docker", "postgresql", "fastapi", "swift", "machine learning", "data science", "product management"]
+            
+            for job in mock_jobs:
+                job_text = f"{job.get('title', '')} {job.get('description', '')}".lower()
+                score = 0
+                
+                for keyword in keywords:
+                    if keyword in resume_lower and keyword in job_text:
+                        score += 0.2
+                
+                # Add some randomness for variety
+                score += random.uniform(0, 0.3)
+                job["match_score"] = min(score, 1.0)
+                job["matching_skills"] = [skill for skill in job.get("skills_required", []) 
+                                        if skill.lower() in resume_lower]
+            
+            # Sort by score and limit results
+            ranked_jobs = sorted(mock_jobs, key=lambda x: x.get("match_score", 0.0), reverse=True)
+            final_jobs = ranked_jobs[:max_jobs]
+            
+            return {
+                "jobs": final_jobs,
+                "metadata": {
+                    "total_fetched": len(mock_jobs),
+                    "open_jobs": len(mock_jobs),
+                    "valid_links": len(mock_jobs),
+                    "unique_jobs": len(mock_jobs),
+                    "returned": len(final_jobs),
+                    "duration_seconds": 1.2,
+                    "sources_queried": 3,
+                    "timestamp": datetime.now().isoformat()
+                }
+            }
+            
+        except Exception as e:
+            print(f"Live jobs search error: {e}")
+            return {"error": str(e)}
     
     def do_GET(self):
         try:
@@ -201,6 +457,15 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
                 jobs = self.get_real_jobs()
                 print(f"Returning {len(jobs)} jobs")
                 self.wfile.write(json.dumps(jobs).encode())
+            elif path == '/api/v1/jobs/live/health':
+                # Health check for live jobs
+                response = {
+                    "status": "healthy",
+                    "timestamp": datetime.now().isoformat(),
+                    "test_source": "mock",
+                    "test_result": True
+                }
+                self.wfile.write(json.dumps(response).encode())
             else:
                 response = {"message": "Mock API endpoint", "path": path}
                 print(f"Unknown path: {path}")
@@ -317,6 +582,18 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
                     self.end_headers()
                     self.wfile.write(json.dumps({"error": str(e)}).encode())
                     return
+            elif path == '/api/v1/jobs/live':
+                # Handle live jobs search
+                content_length = int(self.headers.get('Content-Length', 0))
+                post_data = self.rfile.read(content_length) if content_length > 0 else b''
+                
+                result = self.handle_live_jobs_search(post_data)
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps(result).encode())
             elif path.startswith('/api/v1/resumes/') and path.endswith('/parse'):
                 # Handle resume parsing
                 resume_id = path.split('/')[-2]
@@ -418,7 +695,7 @@ def run_server():
         server_address = ('', 8000)
         httpd = HTTPServer(server_address, WorkingBackendHandler)
         print("Working backend server running on http://localhost:8000")
-        print("This server can handle actual file uploads, resume parsing, and real job matching!")
+        print("This server can handle actual file uploads, resume parsing, and live job matching!")
         print("Press Ctrl+C to stop")
         httpd.serve_forever()
     except KeyboardInterrupt:

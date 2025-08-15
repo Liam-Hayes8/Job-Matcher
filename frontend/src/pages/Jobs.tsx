@@ -40,7 +40,7 @@ const Jobs: React.FC = () => {
   return (
     <Box>
       <Typography variant="h4" gutterBottom sx={{ mb: 4 }}>
-        Available Jobs
+        Available Internships
       </Typography>
 
       <Grid container spacing={3}>
