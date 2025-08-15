@@ -39,7 +39,7 @@ class LiveJobSearchResponse(BaseModel):
     jobs: List[Dict]
     metadata: Dict
 
-@router.post("/api/v1/jobs/live", response_model=LiveJobSearchResponse)
+@router.post("/jobs/live", response_model=LiveJobSearchResponse)
 async def jobs_live(request: LiveJobSearchRequest):
     """
     Live job search endpoint that fetches fresh jobs from ATS APIs
@@ -129,7 +129,7 @@ async def jobs_live(request: LiveJobSearchRequest):
         logger.error(f"Live job search failed: {e}")
         raise HTTPException(status_code=500, detail=f"Job search failed: {str(e)}")
 
-@router.get("/api/v1/jobs/live/health")
+@router.get("/jobs/live/health")
 async def live_jobs_health():
     """Health check for live job search service"""
     try:
@@ -144,7 +144,7 @@ async def live_jobs_health():
         logger.error(f"Health check failed: {e}")
         raise HTTPException(status_code=500, detail="Health check failed")
 
-@router.post("/api/v1/jobs/live/prewarm")
+@router.post("/jobs/live/prewarm")
 async def prewarm_jobs(background_tasks: BackgroundTasks):
     """Pre-warm job vectors and cache for faster subsequent requests"""
     background_tasks.add_task(_prewarm_job_vectors)
@@ -161,7 +161,7 @@ async def _prewarm_job_vectors():
     except Exception as e:
         logger.error(f"Pre-warming failed: {e}")
 
-@router.get("/api/v1/jobs/live/validate/{job_id}")
+@router.get("/jobs/live/validate/{job_id}")
 async def validate_single_job(job_id: str):
     """Validate a single job's apply URL"""
     try:
