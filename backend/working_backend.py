@@ -314,7 +314,48 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
             
             print(f"Using resume with tokens: {sorted(list(tokens))[:5]}")
             
-            # Mock live jobs data - FOCUSED ON INTERNSHIPS
+            # Optionally fetch live jobs from Greenhouse boards if enabled
+            def fetch_greenhouse_boards(board_tokens):
+                jobs = []
+                for token in board_tokens:
+                    try:
+                        url = f"https://boards-api.greenhouse.io/v1/boards/{token}/jobs?content=true"
+                        resp = requests.get(url, timeout=12)
+                        if resp.status_code != 200:
+                            continue
+                        data = resp.json()
+                        for jj in data.get("jobs", []):
+                            abs_url = jj.get("absolute_url")
+                            if not abs_url:
+                                continue
+                            jobs.append({
+                                "id": str(jj.get("id")),
+                                "title": jj.get("title") or "",
+                                "company": token.capitalize(),
+                                "description": jj.get("content") or "",
+                                "location": (jj.get("location") or {}).get("name"),
+                                "apply_url": abs_url,
+                                "posted_at": jj.get("updated_at"),
+                                "open": True,
+                                "source": "greenhouse",
+                                "job_id": str(jj.get("id")),
+                                "job_type": None,
+                                "remote": None,
+                                "salary_min": None,
+                                "salary_max": None,
+                            })
+                    except Exception:
+                        continue
+                return jobs
+
+            use_live = os.getenv("USE_LIVE", "0") == "1"
+            jobs_source = []
+            if use_live:
+                # Default boards; override via GH_BOARDS env (comma-separated)
+                boards = os.getenv("GH_BOARDS", "datadog,coinbase,robinhood,affirm").split(",")
+                boards = [b.strip() for b in boards if b.strip()]
+                jobs_source = fetch_greenhouse_boards(boards)
+            # Mock live jobs data - FOCUSED ON INTERNSHIPS (fallback)
             mock_jobs = [
                 {
                     "id": "google_intern_001",
@@ -539,7 +580,7 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
             ]
             
             # Filter jobs based on resume signals and link validation
-            jobs = mock_jobs
+            jobs = jobs_source if use_live and jobs_source else mock_jobs
             fetched_total = len(jobs)
             
             # Filter to internships
