@@ -85,6 +85,28 @@ async def link_is_live(url: str) -> bool:
     except:
         return False
 
+def _validate_links_sync(urls: list[str]) -> list[bool]:
+    """Synchronously validate a list of URLs using the async validator.
+    Returns a list of booleans in the same order as input URLs.
+    """
+    async def _run(urls_inner: list[str]) -> list[bool]:
+        results: list[bool] = []
+        for u in urls_inner:
+            ok = await link_is_live(u)
+            results.append(ok)
+        return results
+
+    try:
+        return asyncio.run(_run(urls))
+    except RuntimeError:
+        # If there's already a running loop (unlikely in this server), create a new one
+        loop = asyncio.new_event_loop()
+        try:
+            asyncio.set_event_loop(loop)
+            return loop.run_until_complete(_run(urls))
+        finally:
+            loop.close()
+
 class WorkingBackendHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         # Custom logging to see what's happening
@@ -494,10 +516,12 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
             
             # Filter jobs based on resume signals and link validation
             jobs = mock_jobs
+            fetched_total = len(jobs)
             
             # Filter to internships
             jobs = [j for j in jobs if intern_like(j.get('title', ''))]
-            print(f"After intern filter: {len(jobs)} jobs")
+            after_intern = len(jobs)
+            print(f"After intern filter: {after_intern} jobs")
             
             # Score by resume tokens
             for j in jobs:
@@ -505,7 +529,8 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
             
             # Keep if score >= 1.0, else drop
             scored = [j for j in jobs if j['score'] >= 1.0]
-            print(f"After score filter: {len(scored)} jobs")
+            after_score = len(scored)
+            print(f"After score filter: {after_score} jobs")
             
             # Fallback widening if too few results
             if len(scored) < 10:
@@ -516,11 +541,15 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
             
             # Filter to allowed hosts only
             scored = [j for j in scored if host_allowed(j.get('apply_url', ''))]
-            print(f"After host filter: {len(scored)} jobs")
+            after_allow = len(scored)
+            print(f"After host filter: {after_allow} jobs")
             
-            # Note: In production, you would validate links live here:
-            # scored = [j for j in scored if await link_is_live(j.get('apply_url', ''))]
-            # For now, we'll assume all our mock URLs are valid
+            # Live-validate links now (2xx + no tombstone text)
+            urls = [j.get('apply_url', '') for j in scored]
+            results = _validate_links_sync(urls)
+            scored = [j for j, ok in zip(scored, results) if ok]
+            after_validation = len(scored)
+            print(f"After live validation: {after_validation} jobs")
             
             # Sort by score and limit results
             scored.sort(key=lambda x: x['score'], reverse=True)
@@ -537,8 +566,11 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
                     "used_resume_id": resume_id,
                     "resume_sha": text_hash,
                     "tokens": sorted(list(tokens))[:8],
-                    "fetched": len(mock_jobs),
-                    "kept_after_score": len(scored)
+                    "fetched_total": fetched_total,
+                    "after_intern": after_intern,
+                    "after_score": after_score,
+                    "after_allowlist": after_allow,
+                    "after_validation": after_validation,
                 }
             }
             

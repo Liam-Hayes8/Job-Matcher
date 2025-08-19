@@ -119,14 +119,26 @@ const Jobs: React.FC = () => {
                 </CardContent>
                 
                 <CardActions>
-                  <Button 
-                    size="small" 
-                    variant="contained" 
-                    startIcon={<WorkIcon />}
-                    fullWidth
-                  >
-                    Apply Now
-                  </Button>
+                  {job.apply_url || job.applyUrl ? (
+                    <Button
+                      component="a"
+                      href={job.apply_url || job.applyUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      size="small"
+                      variant="contained"
+                      startIcon={<WorkIcon />}
+                      fullWidth
+                      sx={{ textDecoration: 'none' }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Apply Now
+                    </Button>
+                  ) : (
+                    <Button size="small" variant="contained" startIcon={<WorkIcon />} fullWidth disabled>
+                      Link Unavailable
+                    </Button>
+                  )}
                 </CardActions>
               </Card>
             </Grid>
