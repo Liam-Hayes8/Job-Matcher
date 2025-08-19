@@ -19,7 +19,7 @@ A full-stack Resume Parser + Job Matcher application deployed on Google Cloud Pl
 - 🔐 **Firebase Authentication** - Secure user authentication
 - 📄 **Resume Parsing** - AI-powered extraction of skills, experience, and contact info
 - 🎯 **Live Job Matching** - Real-time job matching with ATS integration and AI embeddings
-- 🔄 **ATS Integration** - Direct integration with Greenhouse, Lever, Ashby, SmartRecruiters, and Adzuna
+- 🔄 **ATS Integration** - Direct integration with Greenhouse, Lever, and Ashby (canonical ATS apply links with live validation). Workday/Taleo optionally supported only when deep links pass validation.
 - ⚡ **Serverless Processing** - Cloud Functions for scalable document processing
 - 📊 **Monitoring** - Comprehensive observability with Prometheus metrics
 - 🚀 **Auto-scaling** - Kubernetes HPA for dynamic scaling based on load
@@ -195,9 +195,14 @@ Once deployed, access the API documentation at:
 
 - `POST /api/v1/resumes/upload` - Upload resume file
 - `POST /api/v1/resumes/{id}/parse` - Parse uploaded resume
-- `POST /api/v1/matches/{resume_id}` - Find job matches
-- `GET /api/v1/jobs/` - List job opportunities
+- `POST /api/v1/jobs/live` - Real-time job search using the selected resume (accepts `resume_id` or `resume_text`; returns only validated, canonical `apply_url` links)
 - `GET /metrics` - Prometheus metrics
+
+#### Live Job Search Guarantees
+
+- Returns only canonical ATS apply URLs (Greenhouse/Lever/Ashby; Workday/Taleo only if validated).
+- Validates links at request time (2xx + no tombstone text; extra title checks for Workday/Taleo).
+- Real-time fetching (no cache) with resume-aware filtering and safe fallbacks when results are sparse.
 
 ## Monitoring and Observability
 
