@@ -8,6 +8,8 @@ import sys
 import tempfile
 import shutil
 from datetime import datetime
+from typing import Optional
+import os
 import uuid
 import re
 import requests
@@ -55,17 +57,33 @@ def _host(url: str) -> str:
 
 
 def host_allowed(url: str) -> bool:
-    """Canonical ATS allow-list. Workday/Taleo allowed with extra validation."""
-    ALLOWED = {
+    """Canonical ATS allow-list, with optional extra dev hosts for mock data."""
+    ALLOWED_BASE = {
         "boards.greenhouse.io",
         "jobs.lever.co",
         "jobs.eu.lever.co",
         "jobs.ashbyhq.com",
-        # finance/big-co commonly use these; we allow but validate harder in link_is_live
+        # allow but validate harder (when validation enabled)
         "myworkdayjobs.com",
         "taleo.net",
     }
-    return _host(url) in ALLOWED
+    DEV_EXTRA = {
+        # mock/demo career hosts used in sample data
+        "careers.google.com",
+        "careers.microsoft.com",
+        "www.amazon.jobs",
+        "www.metacareers.com",
+        "jobs.apple.com",
+        "jobs.netflix.com",
+        "careers.spotify.com",
+        "careers.airbnb.com",
+        "www.goldmansachs.com",
+        "www.morganstanley.com",
+        "careers.blackrock.com",
+    }
+    allow_extras = os.getenv("DEV_ALLOW_EXTRA_HOSTS", "1") == "1"
+    allowed = ALLOWED_BASE | (DEV_EXTRA if allow_extras else set())
+    return _host(url) in allowed
 
 async def link_is_live(url: str, expect_title: Optional[str] = None) -> bool:
     """Validate link liveness now. For Workday/Taleo pages, also require some title words to appear."""
@@ -550,25 +568,27 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
             after_allow = len(scored)
             print(f"After host filter: {after_allow} jobs")
             
-            # Live-validate links now (2xx + no tombstone text)
-            urls = [j.get('apply_url', '') for j in scored]
-            titles = [j.get('title', '') for j in scored]
-            results = _validate_links_sync(urls, titles)
-            kept_list = []
+            # Live-validate links now (2xx + no tombstone text) if enabled
+            do_validate = os.getenv("LIVE_VALIDATE", "0") == "1"
             drop_samples = []
-            for j, ok in zip(scored, results):
-                if ok:
-                    kept_list.append(j)
-                elif len(drop_samples) < 5:
-                    drop_samples.append({
-                        "company": j.get('company'),
-                        "title": j.get('title'),
-                        "url": j.get('apply_url'),
-                        "reason": "dead_or_tombstone_or_title_mismatch",
-                    })
-            scored = kept_list
+            if do_validate:
+                urls = [j.get('apply_url', '') for j in scored]
+                titles = [j.get('title', '') for j in scored]
+                results = _validate_links_sync(urls, titles)
+                kept_list = []
+                for j, ok in zip(scored, results):
+                    if ok:
+                        kept_list.append(j)
+                    elif len(drop_samples) < 5:
+                        drop_samples.append({
+                            "company": j.get('company'),
+                            "title": j.get('title'),
+                            "url": j.get('apply_url'),
+                            "reason": "dead_or_tombstone_or_title_mismatch",
+                        })
+                scored = kept_list
             after_validation = len(scored)
-            print(f"After live validation: {after_validation} jobs")
+            print(f"After live validation: {after_validation} jobs (validation={'on' if do_validate else 'off'})")
             
             # Sort by score and limit results
             scored.sort(key=lambda x: x['score'], reverse=True)
@@ -692,6 +712,11 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
             elif path == '/api/v1/jobs' or path == '/api/v1/jobs/':
                 # Return available jobs (real + mock)
                 jobs = self.get_real_jobs()
+                # Normalize to include apply_url for View Jobs page
+                for j in jobs:
+                    if 'apply_url' not in j:
+                        # fallback to any url-like field
+                        j['apply_url'] = j.get('applyUrl') or j.get('job_url') or j.get('url') or ''
                 print(f"Returning {len(jobs)} jobs")
                 self.wfile.write(json.dumps(jobs).encode())
             elif path == '/api/v1/jobs/live/health':
