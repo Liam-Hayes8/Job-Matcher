@@ -563,10 +563,14 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
                 scored = jobs[:min(20, len(jobs))]
                 print(f"After widening: {len(scored)} jobs")
             
-            # Filter to canonical ATS hosts only
-            scored = [j for j in scored if host_allowed(j.get('apply_url', ''))]
-            after_allow = len(scored)
-            print(f"After host filter: {after_allow} jobs")
+            # Filter to canonical ATS hosts only (can be skipped in dev)
+            if os.getenv("SKIP_ALLOWLIST", "1") == "1":
+                after_allow = len(scored)
+                print(f"After host filter: {after_allow} jobs (skipped)")
+            else:
+                scored = [j for j in scored if host_allowed(j.get('apply_url', ''))]
+                after_allow = len(scored)
+                print(f"After host filter: {after_allow} jobs")
             
             # Live-validate links now (2xx + no tombstone text) if enabled
             do_validate = os.getenv("LIVE_VALIDATE", "0") == "1"
