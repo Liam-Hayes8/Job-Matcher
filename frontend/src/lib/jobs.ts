@@ -1,6 +1,6 @@
 import type { Job } from "../types/job";
 
-function normalizeJob(raw: any): Job {
+export function normalizeJob(raw: any): Job {
   const apply_url =
     raw?.apply_url ??
     raw?.applyUrl ??
@@ -15,6 +15,10 @@ function normalizeJob(raw: any): Job {
     company: raw?.company ?? raw?.organization ?? "",
     location: raw?.location ?? raw?.locations ?? "",
     description: raw?.description ?? "",
+    job_type: raw?.job_type ?? raw?.type ?? undefined,
+    salary_min: raw?.salary_min ?? undefined,
+    salary_max: raw?.salary_max ?? undefined,
+    remote: raw?.remote ?? undefined,
     apply_url,
     source: raw?.source ?? raw?.ats ?? undefined,
   };
@@ -46,6 +50,6 @@ export async function fetchLiveJobs(opts: {
   const rawList = Array.isArray(data.jobs) ? data.jobs : [];
   const jobs: Job[] = rawList
     .map(normalizeJob)
-    .filter(j => typeof j.apply_url === "string" && j.apply_url.length > 0);
+    .filter((j: Job) => typeof j.apply_url === "string" && j.apply_url.length > 0);
   return { jobs, debug: data.debug ?? null };
 }

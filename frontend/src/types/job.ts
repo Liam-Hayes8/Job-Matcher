@@ -4,6 +4,10 @@ export type Job = {
   company: string;
   location?: string;
   description?: string;
+  job_type?: string;
+  salary_min?: number;
+  salary_max?: number;
+  remote?: string;
   apply_url: string;
   source?: string;
 };

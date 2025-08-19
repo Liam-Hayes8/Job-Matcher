@@ -99,7 +99,23 @@ const JobMatches: React.FC = () => {
   // Update matches when data changes
   React.useEffect(() => {
     if (existingMatches && existingMatches.length > 0 && !liveSearchMutation.isPending) {
-      setMatches(existingMatches);
+      // Normalize legacy matches from API shape to our JobMatch type
+      const normalized = existingMatches.map((m: any) => ({
+        id: m.id,
+        title: m.title,
+        company: m.company,
+        location: m.location,
+        description: m.description ?? "",
+        job_type: m.job_type,
+        salary_min: m.salary_min,
+        salary_max: m.salary_max,
+        remote: m.remote,
+        apply_url: m.apply_url ?? m.applyUrl ?? m.url ?? "",
+        source: m.source,
+        match_score: m.match_score,
+        matching_skills: m.matching_skills ?? [],
+      })) as JobMatch[];
+      setMatches(normalized);
     }
   }, [existingMatches, liveSearchMutation.isPending]);
 
@@ -280,12 +296,14 @@ const JobMatches: React.FC = () => {
                         )}
                       </Box>
                     </Box>
-                    <Chip
-                      label={`${Math.round(match.match_score * 100)}% Match`}
-                      color={getScoreColor(match.match_score)}
-                      icon={getScoreIcon(match.match_score)}
-                      sx={{ ml: 2 }}
-                    />
+                    {typeof match.match_score === 'number' && (
+                      <Chip
+                        label={`${Math.round(match.match_score * 100)}% Match`}
+                        color={getScoreColor(match.match_score)}
+                        icon={getScoreIcon(match.match_score)}
+                        sx={{ ml: 2 }}
+                      />
+                    )}
                   </Box>
 
                   <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
@@ -307,7 +325,7 @@ const JobMatches: React.FC = () => {
                       </Box>
                     )}
 
-                    {(match.salary_min || match.salary_max) && (
+                    {(typeof match.salary_min === 'number' || typeof match.salary_max === 'number') && (
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <AttachMoneyIcon sx={{ fontSize: 16, mr: 0.5, color: 'text.secondary' }} />
                         <Typography variant="body2">
@@ -337,14 +355,16 @@ const JobMatches: React.FC = () => {
 
                   <Divider sx={{ my: 2 }} />
 
-                  <Typography variant="body2" paragraph>
-                    {match.description.length > 300
-                      ? `${match.description.substring(0, 300)}...`
-                      : match.description
-                    }
-                  </Typography>
+                  {match.description && (
+                    <Typography variant="body2" paragraph>
+                      {match.description.length > 300
+                        ? `${match.description.substring(0, 300)}...`
+                        : match.description
+                      }
+                    </Typography>
+                  )}
 
-                  {match.matching_skills.length > 0 && (
+                  {match.matching_skills && match.matching_skills.length > 0 && (
                     <Box sx={{ mb: 2 }}>
                       <Typography variant="subtitle2" gutterBottom>
                         Matching Skills:
