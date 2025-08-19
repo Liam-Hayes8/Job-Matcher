@@ -46,64 +46,70 @@ def token_score(title: str, desc: str, tokens: set[str]) -> float:
     return 2.0 * s - 0.5 * f
   return f + s
 
-def host_allowed(url: str) -> bool:
-    """Check if the host is in our allow-list"""
+def _host(url: str) -> str:
     from urllib.parse import urlparse
+    try:
+        return urlparse(url).netloc.lower()
+    except Exception:
+        return ""
+
+
+def host_allowed(url: str) -> bool:
+    """Canonical ATS allow-list. Workday/Taleo allowed with extra validation."""
     ALLOWED = {
         "boards.greenhouse.io",
-        "jobs.lever.co", "jobs.eu.lever.co",
+        "jobs.lever.co",
+        "jobs.eu.lever.co",
         "jobs.ashbyhq.com",
-        "careers.smartrecruiters.com",
-        "careers.google.com",
-        "careers.microsoft.com",
-        "www.amazon.jobs",
-        "www.metacareers.com",
-        "jobs.apple.com",
-        "jobs.netflix.com",
-        "careers.spotify.com",
-        "careers.airbnb.com",
-        "www.goldmansachs.com",
-        "www.morganstanley.com",
-        "careers.blackrock.com"
+        # finance/big-co commonly use these; we allow but validate harder in link_is_live
+        "myworkdayjobs.com",
+        "taleo.net",
     }
-    return urlparse(url).netloc in ALLOWED
+    return _host(url) in ALLOWED
 
-async def link_is_live(url: str) -> bool:
-    """Check if a job link is currently live"""
+async def link_is_live(url: str, expect_title: Optional[str] = None) -> bool:
+    """Validate link liveness now. For Workday/Taleo pages, also require some title words to appear."""
     import httpx
     _BAD = re.compile(r"(no longer available|job not found|position closed|no longer posted|no vacancies)", re.I)
-    
     try:
-        timeout = httpx.Timeout(10)
+        timeout = httpx.Timeout(20.0)
         async with httpx.AsyncClient(follow_redirects=True, timeout=timeout) as c:
             r = await c.head(url)
             if r.status_code in (405, 403):
                 r = await c.get(url)
             if r.status_code // 100 != 2:
                 return False
-            return _BAD.search((r.text or "")[:3000]) is None
-    except:
+            text = (r.text or "")[:8000]
+            if _BAD.search(text):
+                return False
+            h = _host(url)
+            if ("myworkdayjobs.com" in h or "taleo.net" in h) and expect_title:
+                words = [w for w in expect_title.lower().split() if len(w) > 3]
+                if words and sum(w in text.lower() for w in words) < max(2, len(words)//3):
+                    return False
+            return True
+    except Exception:
         return False
 
-def _validate_links_sync(urls: list[str]) -> list[bool]:
+def _validate_links_sync(urls: list[str], titles: list[str]) -> list[bool]:
     """Synchronously validate a list of URLs using the async validator.
     Returns a list of booleans in the same order as input URLs.
     """
-    async def _run(urls_inner: list[str]) -> list[bool]:
+    async def _run(urls_inner: list[str], titles_inner: list[str]) -> list[bool]:
         results: list[bool] = []
-        for u in urls_inner:
-            ok = await link_is_live(u)
+        for u, t in zip(urls_inner, titles_inner):
+            ok = await link_is_live(u, expect_title=t)
             results.append(ok)
         return results
 
     try:
-        return asyncio.run(_run(urls))
+        return asyncio.run(_run(urls, titles))
     except RuntimeError:
         # If there's already a running loop (unlikely in this server), create a new one
         loop = asyncio.new_event_loop()
         try:
             asyncio.set_event_loop(loop)
-            return loop.run_until_complete(_run(urls))
+            return loop.run_until_complete(_run(urls, titles))
         finally:
             loop.close()
 
@@ -539,15 +545,28 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
                 scored = jobs[:min(20, len(jobs))]
                 print(f"After widening: {len(scored)} jobs")
             
-            # Filter to allowed hosts only
+            # Filter to canonical ATS hosts only
             scored = [j for j in scored if host_allowed(j.get('apply_url', ''))]
             after_allow = len(scored)
             print(f"After host filter: {after_allow} jobs")
             
             # Live-validate links now (2xx + no tombstone text)
             urls = [j.get('apply_url', '') for j in scored]
-            results = _validate_links_sync(urls)
-            scored = [j for j, ok in zip(scored, results) if ok]
+            titles = [j.get('title', '') for j in scored]
+            results = _validate_links_sync(urls, titles)
+            kept_list = []
+            drop_samples = []
+            for j, ok in zip(scored, results):
+                if ok:
+                    kept_list.append(j)
+                elif len(drop_samples) < 5:
+                    drop_samples.append({
+                        "company": j.get('company'),
+                        "title": j.get('title'),
+                        "url": j.get('apply_url'),
+                        "reason": "dead_or_tombstone_or_title_mismatch",
+                    })
+            scored = kept_list
             after_validation = len(scored)
             print(f"After live validation: {after_validation} jobs")
             
@@ -571,6 +590,7 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
                     "after_score": after_score,
                     "after_allowlist": after_allow,
                     "after_validation": after_validation,
+                    "dropped_examples": drop_samples if 'drop_samples' in locals() else [],
                 }
             }
             
