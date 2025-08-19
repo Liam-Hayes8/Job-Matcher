@@ -20,7 +20,8 @@ import {
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useSnackbar } from 'notistack';
-import { matchApi, liveJobApi, setAuthToken, JobMatch, LiveJobSearchRequest } from '../services/api';
+import { matchApi, liveJobApi, setAuthToken, LiveJobSearchRequest } from '../services/api';
+import type { JobMatch } from '../types/job';
 import { fetchLiveJobs } from '../lib/jobs';
 import { useMockAuth as useAuth } from '../contexts/MockAuthContext';
 import WorkIcon from '@mui/icons-material/Work';
@@ -401,10 +402,10 @@ const JobMatches: React.FC = () => {
                   )}
 
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-                    {(match.apply_url || match.url) ? (
+                    {match.apply_url ? (
                       <Button
                         component="a"
-                        href={match.apply_url || match.url}
+                        href={match.apply_url}
                         target="_blank"
                         rel="noopener noreferrer"
                         variant="contained"

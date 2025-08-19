@@ -119,10 +119,10 @@ const Jobs: React.FC = () => {
                 </CardContent>
                 
                 <CardActions>
-                  {job.apply_url || job.applyUrl ? (
+                  {job.apply_url ? (
                     <Button
                       component="a"
-                      href={job.apply_url || job.applyUrl}
+                      href={job.apply_url}
                       target="_blank"
                       rel="noopener noreferrer"
                       size="small"

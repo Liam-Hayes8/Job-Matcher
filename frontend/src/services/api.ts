@@ -38,6 +38,8 @@ export interface JobListing {
   job_type?: string;
   remote?: string;
   url?: string;
+  apply_url?: string;
+  applyUrl?: string;
   source?: string;
   skills_required?: string[];
   created_at?: string;
@@ -55,6 +57,8 @@ export interface JobMatch {
   job_type?: string;
   remote?: string;
   url?: string;
+  apply_url?: string;
+  applyUrl?: string;
   source?: string;
   match_score: number;
   matching_skills: string[];
