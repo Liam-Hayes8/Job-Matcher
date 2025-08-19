@@ -14,6 +14,76 @@ import requests
 import asyncio
 import hashlib
 import random
+import re
+
+# Global resume storage (in-memory for now)
+RESUME_STORAGE = {}
+
+# Resume signal tokens for job matching
+FIN_TOK = ("finance","financial","analyst","asset","wealth","equity","portfolio",
+           "investment","trading","fp&a","valuation","real estate","acquisition",
+           "underwriting","accounting","bloomberg","quickbooks","oracle")
+SWE_TOK = ("software","engineer","developer","backend","frontend","full stack",
+           "python","java","react","kubernetes","docker")
+
+def extract_resume_signals(text: str):
+    """Extract resume signals for job matching"""
+    t = text.lower()
+    return {w for w in FIN_TOK + SWE_TOK if w in t}
+
+def is_intern(title: str) -> bool:
+    """Check if a job title indicates an internship"""
+    t = title.lower()
+    return any(k in t for k in ("intern","co-op","summer","new grad","2025","2026"))
+
+def rough_match_resume(job, tokens: set) -> bool:
+    """Quick filter so a finance resume doesn't surface SWE titles and vice versa."""
+    t = (job.get('title', '') + " " + (job.get('description') or "")).lower()
+    if any(k in tokens for k in FIN_TOK):
+        # finance resume → allow finance-y text, block overt SWE terms
+        return (any(k in t for k in FIN_TOK) and not any(k in t for k in SWE_TOK))
+    if any(k in tokens for k in SWE_TOK):
+        return any(k in t for k in SWE_TOK)
+    return True
+
+def host_allowed(url: str) -> bool:
+    """Check if the host is in our allow-list"""
+    from urllib.parse import urlparse
+    ALLOWED = {
+        "boards.greenhouse.io",
+        "jobs.lever.co", "jobs.eu.lever.co",
+        "jobs.ashbyhq.com",
+        "careers.smartrecruiters.com",
+        "careers.google.com",
+        "careers.microsoft.com",
+        "www.amazon.jobs",
+        "www.metacareers.com",
+        "jobs.apple.com",
+        "jobs.netflix.com",
+        "careers.spotify.com",
+        "careers.airbnb.com",
+        "www.goldmansachs.com",
+        "www.morganstanley.com",
+        "careers.blackrock.com"
+    }
+    return urlparse(url).netloc in ALLOWED
+
+async def link_is_live(url: str) -> bool:
+    """Check if a job link is currently live"""
+    import httpx
+    _BAD = re.compile(r"(no longer available|job not found|position closed|no longer posted|no vacancies)", re.I)
+    
+    try:
+        timeout = httpx.Timeout(10)
+        async with httpx.AsyncClient(follow_redirects=True, timeout=timeout) as c:
+            r = await c.head(url)
+            if r.status_code in (405, 403):
+                r = await c.get(url)
+            if r.status_code // 100 != 2:
+                return False
+            return _BAD.search((r.text or "")[:3000]) is None
+    except:
+        return False
 
 class WorkingBackendHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
@@ -164,13 +234,39 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
         ]
     
     def handle_live_jobs_search(self, post_data):
-        """Handle live jobs search request"""
+        """Handle live jobs search request with resume-aware personalization"""
         try:
             # Parse request data
             data = json.loads(post_data.decode('utf-8'))
+            resume_id = data.get('resume_id')
             resume_text = data.get('resume_text', '')
             location = data.get('location', 'US')
-            max_jobs = data.get('max_jobs', 20)
+            limit = data.get('limit', 30)
+            debug = data.get('debug', False)
+            
+            print(f"Live jobs search: resume_id={resume_id}, resume_length={len(resume_text)}, location={location}, limit={limit}, debug={debug}")
+            
+            # Load resume text
+            text = ""
+            if resume_id:
+                if resume_id in RESUME_STORAGE:
+                    stored_resume = RESUME_STORAGE[resume_id]
+                    if stored_resume.get('parsed'):
+                        text = stored_resume.get('text', '')
+                    else:
+                        return {"error": "Resume not parsed yet."}
+                else:
+                    return {"error": "Resume not found."}
+            elif resume_text:
+                text = resume_text
+            else:
+                return {"error": "Provide resume_id or resume_text."}
+            
+            # Extract resume signals
+            tokens = extract_resume_signals(text)
+            text_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
+            
+            print(f"Using resume with tokens: {sorted(list(tokens))[:5]}")
             
             # Mock live jobs data - FOCUSED ON INTERNSHIPS
             mock_jobs = [
@@ -333,44 +429,116 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
                     "duration": "12 weeks",
                     "skills_required": ["Analytics", "User Research", "SQL", "Product Strategy", "Communication"],
                     "requirements": ["Business/Engineering major", "Leadership experience", "Strong analytical skills"]
+                },
+                {
+                    "id": "goldman_intern_009",
+                    "title": "Investment Banking Summer Analyst",
+                    "company": "Goldman Sachs",
+                    "description": "Join our investment banking team and work on mergers, acquisitions, and capital raising transactions. Gain exposure to financial modeling and valuation.",
+                    "location": "New York, NY",
+                    "apply_url": "https://www.goldmansachs.com/careers/internships/123456",
+                    "posted_at": datetime.now().isoformat(),
+                    "open": True,
+                    "source": "greenhouse",
+                    "job_id": "intern_009",
+                    "department": "Investment Banking",
+                    "job_type": "Internship",
+                    "remote": "On-site",
+                    "salary_min": 12000,
+                    "salary_max": 18000,
+                    "duration": "10 weeks",
+                    "skills_required": ["Financial Modeling", "Excel", "Valuation", "Accounting", "Bloomberg"],
+                    "requirements": ["Finance/Economics major", "Strong analytical skills", "GPA 3.5+"]
+                },
+                {
+                    "id": "morgan_intern_010",
+                    "title": "Financial Analyst Intern",
+                    "company": "Morgan Stanley",
+                    "description": "Analyze financial data and market trends to support investment decisions. Work with Bloomberg terminals and financial modeling tools.",
+                    "location": "New York, NY",
+                    "apply_url": "https://www.morganstanley.com/careers/internships/123456",
+                    "posted_at": datetime.now().isoformat(),
+                    "open": True,
+                    "source": "greenhouse",
+                    "job_id": "intern_010",
+                    "department": "Finance",
+                    "job_type": "Internship",
+                    "remote": "Hybrid",
+                    "salary_min": 10000,
+                    "salary_max": 15000,
+                    "duration": "12 weeks",
+                    "skills_required": ["Financial Analysis", "Bloomberg", "QuickBooks", "Excel", "Accounting"],
+                    "requirements": ["Finance/Accounting major", "Proficiency in Excel", "Knowledge of financial markets"]
+                },
+                {
+                    "id": "blackrock_intern_011",
+                    "title": "Asset Management Intern",
+                    "company": "BlackRock",
+                    "description": "Learn about portfolio management and investment strategies. Work with real assets and help manage client portfolios.",
+                    "location": "New York, NY",
+                    "apply_url": "https://careers.blackrock.com/internships/123456",
+                    "posted_at": datetime.now().isoformat(),
+                    "open": True,
+                    "source": "greenhouse",
+                    "job_id": "intern_011",
+                    "department": "Asset Management",
+                    "job_type": "Internship",
+                    "remote": "On-site",
+                    "salary_min": 11000,
+                    "salary_max": 16000,
+                    "duration": "12 weeks",
+                    "skills_required": ["Portfolio Management", "Asset Allocation", "Risk Management", "Bloomberg", "Financial Modeling"],
+                    "requirements": ["Finance/Economics major", "Interest in markets", "Strong quantitative skills"]
                 }
             ]
             
-            # Simple ranking based on keyword matching
-            resume_lower = resume_text.lower()
-            keywords = ["python", "javascript", "react", "aws", "docker", "postgresql", "fastapi", "swift", "machine learning", "data science", "product management"]
+            # Filter jobs based on resume signals and link validation
+            jobs = mock_jobs
             
-            for job in mock_jobs:
+            # Filter to internships
+            jobs = [j for j in jobs if is_intern(j.get('title', ''))]
+            print(f"After intern filter: {len(jobs)} jobs")
+            
+            # Filter based on resume signals (personalization)
+            jobs = [j for j in jobs if rough_match_resume(j, tokens)]
+            print(f"After resume filter: {len(jobs)} jobs")
+            
+            # Filter to allowed hosts only
+            jobs = [j for j in jobs if host_allowed(j.get('apply_url', ''))]
+            print(f"After host filter: {len(jobs)} jobs")
+            
+            # Note: In production, you would validate links live here:
+            # jobs = [j for j in jobs if await link_is_live(j.get('apply_url', ''))]
+            # For now, we'll assume all our mock URLs are valid
+            
+            # Simple scoring based on keyword matching
+            for job in jobs:
                 job_text = f"{job.get('title', '')} {job.get('description', '')}".lower()
                 score = 0
-                
-                for keyword in keywords:
-                    if keyword in resume_lower and keyword in job_text:
-                        score += 0.2
-                
-                # Add some randomness for variety
-                score += random.uniform(0, 0.3)
-                job["match_score"] = min(score, 1.0)
-                job["matching_skills"] = [skill for skill in job.get("skills_required", []) 
-                                        if skill.lower() in resume_lower]
+                for token in tokens:
+                    if token in job_text:
+                        score += 0.1
+                job['score'] = min(score, 1.0)
             
             # Sort by score and limit results
-            ranked_jobs = sorted(mock_jobs, key=lambda x: x.get("match_score", 0.0), reverse=True)
-            final_jobs = ranked_jobs[:max_jobs]
+            jobs.sort(key=lambda x: x.get('score', 0), reverse=True)
+            jobs = jobs[:limit]
             
-            return {
-                "jobs": final_jobs,
-                "metadata": {
-                    "total_fetched": len(mock_jobs),
-                    "open_jobs": len(mock_jobs),
-                    "valid_links": len(mock_jobs),
-                    "unique_jobs": len(mock_jobs),
-                    "returned": len(final_jobs),
-                    "duration_seconds": 1.2,
-                    "sources_queried": 3,
-                    "timestamp": datetime.now().isoformat()
+            print(f"Live job search results: {len(jobs)} jobs returned")
+            if jobs:
+                print(f"  - Top job: {jobs[0].get('title')} at {jobs[0].get('company')} (score: {jobs[0].get('score', 0):.3f})")
+            
+            # Return predictable shape with debug info
+            payload = {
+                "jobs": jobs,
+                "debug": {
+                    "used_resume_id": resume_id,
+                    "resume_sha": text_hash,
+                    "tokens": sorted(list(tokens))[:8]
                 }
             }
+            
+            return payload
             
         except Exception as e:
             print(f"Live jobs search error: {e}")
@@ -401,19 +569,32 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
                                 file_path = os.path.join(user_path, filename)
                                 if os.path.isfile(file_path):
                                     stat = os.stat(file_path)
+                                    resume_id = str(len(resumes) + 1)
                                     
-                                    # Check if resume has been parsed
-                                    parsed_file = file_path.replace('.pdf', '_parsed.json')
+                                    # Check if resume has been parsed (read from DB, not sidecar file)
                                     parsed_data = None
-                                    if os.path.exists(parsed_file):
-                                        try:
-                                            with open(parsed_file, 'r') as f:
-                                                parsed_data = json.load(f)
-                                        except:
-                                            pass
+                                    if resume_id in RESUME_STORAGE:
+                                        stored_resume = RESUME_STORAGE[resume_id]
+                                        if stored_resume.get('parsed'):
+                                            parsed_data = {
+                                                "skills": ["Python", "JavaScript", "React", "FastAPI", "SQL", "Docker", "Git", "AWS"],
+                                                "experience": [
+                                                    {
+                                                        "title": "Software Engineer",
+                                                        "company": "Tech Company",
+                                                        "duration": "2 years",
+                                                        "description": "Developed web applications using Python and React"
+                                                    }
+                                                ],
+                                                "contact_info": {
+                                                    "name": "Test User",
+                                                    "email": "test@example.com",
+                                                    "phone": "+1-555-0123"
+                                                }
+                                            }
                                     
                                     resumes.append({
-                                        "id": len(resumes) + 1,
+                                        "id": int(resume_id),
                                         "filename": filename,
                                         "file_path": file_path,
                                         "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
@@ -592,10 +773,11 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
                 self.send_header('Access-Control-Allow-Origin', '*')
+                self.send_header('Cache-Control', 'no-store')  # Real-time, no caching
                 self.end_headers()
                 self.wfile.write(json.dumps(result).encode())
             elif path.startswith('/api/v1/resumes/') and path.endswith('/parse'):
-                # Handle resume parsing
+                # Handle resume parsing - write parsed text to DB as single source of truth
                 resume_id = path.split('/')[-2]
                 
                 # Find the resume file
@@ -616,34 +798,19 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
                 if not resume_file:
                     raise Exception("Resume file not found")
                 
-                # Mock resume parsing response (in production, this would use AI/ML)
-                parsed_data = {
-                    "skills": ["Python", "JavaScript", "React", "FastAPI", "SQL", "Docker", "Git", "AWS"],
-                    "experience": [
-                        {
-                            "title": "Software Engineer",
-                            "company": "Tech Company",
-                            "duration": "2 years",
-                            "description": "Developed web applications using Python and React"
-                        },
-                        {
-                            "title": "Junior Developer",
-                            "company": "Startup",
-                            "duration": "1 year",
-                            "description": "Worked on backend APIs and database design"
-                        }
-                    ],
-                    "contact_info": {
-                        "name": "Liam Hayes",
-                        "email": "liam@example.com",
-                        "phone": "+1-555-0123"
-                    }
-                }
+                # Extract text from PDF (mock for now)
+                text = f"Software Engineer with experience in Python, JavaScript, React, and cloud technologies. Resume for {resume_id}."
                 
-                # Save parsed data to file
-                parsed_file = resume_file.replace('.pdf', '_parsed.json')
-                with open(parsed_file, 'w') as f:
-                    json.dump(parsed_data, f)
+                if not text or len(text.strip()) < 20:
+                    raise Exception("Could not extract text")
+                
+                # Store parsed text in DB (in-memory for now)
+                RESUME_STORAGE[resume_id] = {
+                    "id": resume_id,
+                    "text": text,
+                    "parsed_at": datetime.utcnow().isoformat(),
+                    "parsed": True
+                }
                 
                 print(f"Resume {resume_id} parsed successfully")
                 
@@ -651,7 +818,11 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
                 self.send_header('Content-type', 'application/json')
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
-                self.wfile.write(json.dumps(parsed_data).encode())
+                self.wfile.write(json.dumps({
+                    "resume_id": resume_id,
+                    "parsed": True,
+                    "chars": len(text)
+                }).encode())
             elif path.startswith('/api/v1/matches/'):
                 # Handle job matching
                 resume_id = path.split('/')[-1]

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Grid,
   Paper,
@@ -15,7 +15,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSnackbar } from 'notistack';
-import { resumeApi, setAuthToken } from '../services/api';
+import { resumeApi, setAuthToken, fetchLiveJobs } from '../services/api';
 import { useMockAuth as useAuth } from '../contexts/MockAuthContext';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import FindInPageIcon from '@mui/icons-material/FindInPage';
@@ -27,6 +27,9 @@ const Dashboard: React.FC = () => {
   const { getToken, user } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
   const queryClient = useQueryClient();
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [debug, setDebug] = useState<any>(null);
 
   useEffect(() => {
     const setupAuth = async () => {
@@ -79,6 +82,24 @@ const Dashboard: React.FC = () => {
   const handleDeleteResume = async (resumeId: number) => {
     if (window.confirm('Are you sure you want to delete this resume?')) {
       deleteResumeMutation.mutate(resumeId);
+    }
+  };
+
+  const handleFindJobs = async (resumeId: number) => {
+    setLoading(true);
+    try {
+      const { jobs, debug } = await fetchLiveJobs({ 
+        resumeId: resumeId.toString(), 
+        debug: true 
+      });
+      setJobs(jobs);
+      setDebug(debug);
+      enqueueSnackbar(`Found ${jobs.length} job matches!`, { variant: 'success' });
+    } catch (e) {
+      enqueueSnackbar(String(e), { variant: 'error' });
+      setJobs([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -213,9 +234,10 @@ const Dashboard: React.FC = () => {
                             size="small"
                             variant="contained"
                             startIcon={<FindInPageIcon />}
-                            onClick={() => navigate(`/matches/${resume.id}`)}
+                            onClick={() => handleFindJobs(resume.id)}
+                            disabled={loading}
                           >
-                            Find Jobs
+                            {loading ? 'Finding...' : 'Find Jobs'}
                           </Button>
                         )}
                       </Box>
@@ -254,6 +276,63 @@ const Dashboard: React.FC = () => {
             </Paper>
           )}
         </Grid>
+
+        {/* Job Results Section */}
+        {jobs.length > 0 && (
+          <Grid item xs={12}>
+            <Typography variant="h5" gutterBottom sx={{ mt: 3, mb: 2 }}>
+              Job Matches
+            </Typography>
+            
+            {/* Debug Info */}
+            {debug && (
+              <Paper sx={{ p: 2, mb: 2, bgcolor: 'grey.50' }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Debug Info:
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Resume ID: {debug.used_resume_id} | 
+                  Tokens: {debug.tokens?.join(', ')}
+                </Typography>
+              </Paper>
+            )}
+
+            <Grid container spacing={2}>
+              {jobs.map((job, index) => (
+                <Grid item xs={12} md={6} lg={4} key={job.id || index}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>
+                        {job.title}
+                      </Typography>
+                      <Typography variant="subtitle1" color="primary" gutterBottom>
+                        {job.company}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        {job.location}
+                      </Typography>
+                      <Typography variant="body2" sx={{ mb: 2 }}>
+                        {job.description?.substring(0, 150)}...
+                      </Typography>
+                      {job.apply_url && (
+                        <Button
+                          variant="contained"
+                          size="small"
+                          href={job.apply_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          fullWidth
+                        >
+                          Apply Now
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          </Grid>
+        )}
       </Grid>
     </Box>
   );

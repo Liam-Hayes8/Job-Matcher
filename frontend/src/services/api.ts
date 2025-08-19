@@ -61,23 +61,19 @@ export interface JobMatch {
 }
 
 export interface LiveJobSearchRequest {
-  resume_text: string;
+  resume_id?: string;
+  resume_text?: string;
   location?: string;
-  max_jobs?: number;
-  timeout?: number;
+  limit?: number;
+  debug?: boolean;
 }
 
 export interface LiveJobSearchResponse {
   jobs: JobMatch[];
-  metadata: {
-    total_fetched: number;
-    open_jobs: number;
-    valid_links: number;
-    unique_jobs: number;
-    returned: number;
-    duration_seconds: number;
-    sources_queried: number;
-    timestamp: string;
+  debug?: {
+    used_resume_id?: string;
+    resume_sha?: string;
+    tokens?: string[];
   };
 }
 
@@ -119,11 +115,55 @@ export const jobApi = {
 
 export const liveJobApi = {
   searchLiveJobs: (request: LiveJobSearchRequest) => 
-    api.post<LiveJobSearchResponse>('/jobs/live', request),
+    api.post<LiveJobSearchResponse>('/jobs/live', request, {
+      headers: {
+        'Cache-Control': 'no-store',
+      },
+    }),
 
   healthCheck: () => api.get('/jobs/live/health'),
 
   prewarm: () => api.post('/jobs/live/prewarm'),
+};
+
+// Unified fetchLiveJobs function for both Dashboard and View Jobs
+export const fetchLiveJobs = async (opts: {
+  resumeId?: string;
+  resumeText?: string;
+  location?: string;
+  limit?: number;
+  debug?: boolean;
+}): Promise<{ jobs: JobMatch[]; debug?: any }> => {
+  const body: any = {
+    location: opts.location ?? "US",
+    limit: opts.limit ?? 30,
+    debug: !!opts.debug
+  };
+  
+  if (opts.resumeId) {
+    body.resume_id = opts.resumeId;
+  } else {
+    body.resume_text = opts.resumeText ?? "";
+  }
+
+  const res = await fetch(`${API_BASE_URL}/api/v1/jobs/live`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    throw new Error(await res.text().catch(() => res.statusText));
+  }
+  
+  const data = await res.json().catch(() => ({}));
+  return {
+    jobs: Array.isArray(data.jobs) ? data.jobs : [],
+    debug: data.debug ?? null
+  };
 };
 
 export const matchApi = {
