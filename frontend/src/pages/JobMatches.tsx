@@ -21,6 +21,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useSnackbar } from 'notistack';
 import { matchApi, liveJobApi, setAuthToken, JobMatch, LiveJobSearchRequest } from '../services/api';
+import { fetchLiveJobs } from '../lib/jobs';
 import { useMockAuth as useAuth } from '../contexts/MockAuthContext';
 import WorkIcon from '@mui/icons-material/Work';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
@@ -54,7 +55,7 @@ const JobMatches: React.FC = () => {
 
   // Live job search mutation
   const liveSearchMutation = useMutation({
-    mutationFn: async (request: LiveJobSearchRequest) => {
+    mutationFn: async () => {
       // Cancel any previous request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -63,12 +64,16 @@ const JobMatches: React.FC = () => {
       // Create new abort controller
       abortControllerRef.current = new AbortController();
       
-      return liveJobApi.searchLiveJobs(request);
+      return fetchLiveJobs({ 
+        resumeId: resumeId, 
+        debug: true,
+        limit: 40
+      });
     },
     onSuccess: (response) => {
-      setMatches(response.data.jobs);
-      setSearchMetadata(response.data.metadata);
-      enqueueSnackbar(`Found ${response.data.jobs.length} fresh job matches!`, { variant: 'success' });
+      setMatches(response.jobs);
+      setSearchMetadata(response.debug);
+      enqueueSnackbar(`Found ${response.jobs.length} fresh job matches!`, { variant: 'success' });
     },
     onError: (error: any) => {
       if (error.name === 'AbortError') {
@@ -76,7 +81,7 @@ const JobMatches: React.FC = () => {
       } else {
         console.error('Failed to find live matches:', error);
         enqueueSnackbar(
-          error.response?.data?.detail || 'Failed to find live job matches', 
+          error.message || 'Failed to find live job matches', 
           { variant: 'error' }
         );
       }
@@ -98,22 +103,12 @@ const JobMatches: React.FC = () => {
   }, [existingMatches, liveSearchMutation.isPending]);
 
   const handleFindLiveMatches = () => {
-    // For now, we'll use a sample resume text
-    // In production, this would come from the parsed resume
-    const sampleResumeText = `
-      Software Engineer with 5+ years of experience in Python, JavaScript, and React.
-      Experience with FastAPI, PostgreSQL, Docker, and AWS. Strong background in
-      full-stack development and cloud architecture.
-    `;
-    
-    const request: LiveJobSearchRequest = {
-      resume_text: sampleResumeText,
-      location: "US",
-      max_jobs: 20,
-      timeout: 12
-    };
-    
-    liveSearchMutation.mutate(request);
+    if (!resumeId) {
+      enqueueSnackbar('Resume ID not found', { variant: 'error' });
+      return;
+    }
+
+    liveSearchMutation.mutate();
   };
 
   const handleCancelSearch = () => {
@@ -201,16 +196,13 @@ const JobMatches: React.FC = () => {
           </Typography>
           <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
             <Typography variant="body2">
-              <strong>{searchMetadata.returned}</strong> jobs returned
+              <strong>Resume ID:</strong> {searchMetadata.used_resume_id || 'N/A'}
             </Typography>
             <Typography variant="body2">
-              <strong>{searchMetadata.valid_links}</strong> valid links
+              <strong>Tokens:</strong> {(searchMetadata.tokens || []).join(', ')}
             </Typography>
             <Typography variant="body2">
-              <strong>{searchMetadata.sources_queried}</strong> sources queried
-            </Typography>
-            <Typography variant="body2">
-              <strong>{searchMetadata.duration_seconds}s</strong> search time
+              <strong>Jobs found:</strong> {matches.length}
             </Typography>
           </Box>
         </Paper>
@@ -409,15 +401,29 @@ const JobMatches: React.FC = () => {
                   )}
 
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      onClick={() => handleApplyClick(match.url)}
-                      startIcon={<LaunchIcon />}
-                      disabled={!match.url}
-                    >
-                      {match.url ? 'Apply Now' : 'Link Unavailable'}
-                    </Button>
+                    {(match.apply_url || match.url) ? (
+                      <Button
+                        component="a"
+                        href={match.apply_url || match.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        variant="contained"
+                        color="primary"
+                        startIcon={<LaunchIcon />}
+                        sx={{ textDecoration: 'none' }}
+                      >
+                        Apply Now
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        disabled
+                        startIcon={<LaunchIcon />}
+                      >
+                        Link Unavailable
+                      </Button>
+                    )}
                   </Box>
                 </CardContent>
               </Card>

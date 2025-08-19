@@ -26,25 +26,25 @@ FIN_TOK = ("finance","financial","analyst","asset","wealth","equity","portfolio"
 SWE_TOK = ("software","engineer","developer","backend","frontend","full stack",
            "python","java","react","kubernetes","docker")
 
-def extract_resume_signals(text: str):
-    """Extract resume signals for job matching"""
-    t = text.lower()
-    return {w for w in FIN_TOK + SWE_TOK if w in t}
+def extract_tokens(text: str) -> set[str]:
+  t = text.lower()
+  return {w for w in FIN_TOK + SWE_TOK if w in t}
 
-def is_intern(title: str) -> bool:
-    """Check if a job title indicates an internship"""
-    t = title.lower()
-    return any(k in t for k in ("intern","co-op","summer","new grad","2025","2026"))
+def intern_like(title: str) -> bool:
+  t = title.lower()
+  return "intern" in t or "co-op" in t or "summer" in t or "new grad" in t
 
-def rough_match_resume(job, tokens: set) -> bool:
-    """Quick filter so a finance resume doesn't surface SWE titles and vice versa."""
-    t = (job.get('title', '') + " " + (job.get('description') or "")).lower()
-    if any(k in tokens for k in FIN_TOK):
-        # finance resume → allow finance-y text, block overt SWE terms
-        return (any(k in t for k in FIN_TOK) and not any(k in t for k in SWE_TOK))
-    if any(k in tokens for k in SWE_TOK):
-        return any(k in t for k in SWE_TOK)
-    return True
+def token_score(title: str, desc: str, tokens: set[str]) -> float:
+  text = (title + " " + (desc or "")).lower()
+  f = sum(1 for k in FIN_TOK if k in text and k in tokens)
+  s = sum(1 for k in SWE_TOK if k in text and k in tokens)
+  # finance-leaning resumes: reward finance matches and penalize SWE terms
+  if any(k in tokens for k in FIN_TOK) and not any(k in tokens for k in SWE_TOK):
+    return 2.0 * f - 1.0 * s
+  # SWE-leaning resumes
+  if any(k in tokens for k in SWE_TOK):
+    return 2.0 * s - 0.5 * f
+  return f + s
 
 def host_allowed(url: str) -> bool:
     """Check if the host is in our allow-list"""
@@ -263,7 +263,7 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
                 return {"error": "Provide resume_id or resume_text."}
             
             # Extract resume signals
-            tokens = extract_resume_signals(text)
+            tokens = extract_tokens(text)
             text_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
             
             print(f"Using resume with tokens: {sorted(list(tokens))[:5]}")
@@ -496,33 +496,35 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
             jobs = mock_jobs
             
             # Filter to internships
-            jobs = [j for j in jobs if is_intern(j.get('title', ''))]
+            jobs = [j for j in jobs if intern_like(j.get('title', ''))]
             print(f"After intern filter: {len(jobs)} jobs")
             
-            # Filter based on resume signals (personalization)
-            jobs = [j for j in jobs if rough_match_resume(j, tokens)]
-            print(f"After resume filter: {len(jobs)} jobs")
+            # Score by resume tokens
+            for j in jobs:
+                j['score'] = token_score(j.get('title', ''), j.get('description', ''), tokens)
+            
+            # Keep if score >= 1.0, else drop
+            scored = [j for j in jobs if j['score'] >= 1.0]
+            print(f"After score filter: {len(scored)} jobs")
+            
+            # Fallback widening if too few results
+            if len(scored) < 10:
+                # widen to keep top N by score even if < 1.0
+                jobs.sort(key=lambda x: x['score'], reverse=True)
+                scored = jobs[:min(20, len(jobs))]
+                print(f"After widening: {len(scored)} jobs")
             
             # Filter to allowed hosts only
-            jobs = [j for j in jobs if host_allowed(j.get('apply_url', ''))]
-            print(f"After host filter: {len(jobs)} jobs")
+            scored = [j for j in scored if host_allowed(j.get('apply_url', ''))]
+            print(f"After host filter: {len(scored)} jobs")
             
             # Note: In production, you would validate links live here:
-            # jobs = [j for j in jobs if await link_is_live(j.get('apply_url', ''))]
+            # scored = [j for j in scored if await link_is_live(j.get('apply_url', ''))]
             # For now, we'll assume all our mock URLs are valid
             
-            # Simple scoring based on keyword matching
-            for job in jobs:
-                job_text = f"{job.get('title', '')} {job.get('description', '')}".lower()
-                score = 0
-                for token in tokens:
-                    if token in job_text:
-                        score += 0.1
-                job['score'] = min(score, 1.0)
-            
             # Sort by score and limit results
-            jobs.sort(key=lambda x: x.get('score', 0), reverse=True)
-            jobs = jobs[:limit]
+            scored.sort(key=lambda x: x['score'], reverse=True)
+            jobs = scored[:limit]
             
             print(f"Live job search results: {len(jobs)} jobs returned")
             if jobs:
@@ -534,7 +536,9 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
                 "debug": {
                     "used_resume_id": resume_id,
                     "resume_sha": text_hash,
-                    "tokens": sorted(list(tokens))[:8]
+                    "tokens": sorted(list(tokens))[:8],
+                    "fetched": len(mock_jobs),
+                    "kept_after_score": len(scored)
                 }
             }
             
