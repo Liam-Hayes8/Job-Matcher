@@ -16,6 +16,10 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -45,6 +49,8 @@ const JobMatches: React.FC = () => {
   const [matches, setMatches] = useState<JobMatch[]>([]);
   const [searchMetadata, setSearchMetadata] = useState<any>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<JobMatch | null>(null);
 
   useEffect(() => {
     const setupAuth = async () => {
@@ -356,12 +362,28 @@ const JobMatches: React.FC = () => {
                   <Divider sx={{ my: 2 }} />
 
                   {match.description && (
-                    <Typography variant="body2" paragraph>
-                      {match.description.length > 300
-                        ? `${match.description.substring(0, 300)}...`
-                        : match.description
-                      }
-                    </Typography>
+                    <>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          display: '-webkit-box',
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {match.description}
+                      </Typography>
+                      {match.description.length > 300 && (
+                        <Button
+                          size="small"
+                          sx={{ mt: 1 }}
+                          onClick={() => { setSelectedJob(match); setDetailsOpen(true); }}
+                        >
+                          View details
+                        </Button>
+                      )}
+                    </>
                   )}
 
                   {match.matching_skills && match.matching_skills.length > 0 && (
@@ -460,6 +482,28 @@ const JobMatches: React.FC = () => {
         </Typography>
         </Box>
       )}
+      <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          {selectedJob?.title} — {selectedJob?.company}
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography whiteSpace="pre-wrap">{selectedJob?.description || 'No description provided.'}</Typography>
+        </DialogContent>
+        <DialogActions>
+          {selectedJob?.apply_url && (
+            <Button
+              component="a"
+              href={selectedJob.apply_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              variant="contained"
+            >
+              Apply Now
+            </Button>
+          )}
+          <Button onClick={() => setDetailsOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
