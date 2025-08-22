@@ -773,6 +773,15 @@ class WorkingBackendHandler(BaseHTTPRequestHandler):
                     "test_result": True
                 }
                 self.wfile.write(json.dumps(response).encode())
+            elif path == '/api/v1/healthz':
+                resp = {
+                    "status": "ok",
+                    "sha": os.popen('git rev-parse --short HEAD').read().strip(),
+                    "adapters": ["greenhouse_only"],
+                    "allowlist_enforced": os.getenv("SKIP_ALLOWLIST", "0") != "1",
+                    "validation": os.getenv("LIVE_VALIDATE", "1") == "1",
+                }
+                self.wfile.write(json.dumps(resp).encode())
             else:
                 response = {"message": "Mock API endpoint", "path": path}
                 print(f"Unknown path: {path}")
